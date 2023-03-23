@@ -1,0 +1,17 @@
+[tool.poetry]
+name = "typerconf"
+version = "1.0"
+description = "Library to read and write configs using API and CLI with Typer"
+authors = ["Daniel Bosk <daniel@bosk.se>"]
+include = ["src/**/*.py"]
+
+[tool.poetry.dependencies]
+python = "^3.9"
+appdirs = "^1.4.4"
+
+[tool.poetry.dev-dependencies]
+pytest = "^5.2"
+
+[build-system]
+requires = ["poetry-core>=1.0.0"]
+build-backend = "poetry.core.masonry.api"
