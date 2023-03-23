@@ -1,76 +1,8 @@
-\section{Overview}\label{Overview}
-
-We provide a module, [[typerconf]], that can read, modify and write config 
-files.
-It's designed to easily provide a config to a program.
-It also provides a [[config]] command to a CLI written using Typer.
-
-This module was originally developed as a part of the [[nytid]] package (the 
-[[nytid.cli.config]] module), to provide a config management similar to that of 
-Git.
-Due to its usefulness, it has now been broken out into its own package.
-
-The configuration is a JSON structure.
-\label{ConfigStructure}
-\begin{minted}{JSON}
-{
-  "courses": {
-    "datintro22": {
-      "timesheet": {
-        "url": "https://sheets.google..."
-      },
-      "schedule": {
-        "url": "https://timeedit.net/..."
-      }
-    }
-  }
-}
-\end{minted}
-The format is actually irrelevant to anyone outside of this library, since it 
-will never be accessed directly anyway.
-But it will be used to illustrate the following.
-
-Then we can access values by dot-separated addresses.
-For instance, we can use [[courses.datintro22.schedule.url]] to access the 
-TimeEdit URL of the datintro22 course.
-(We'll use the class provided in \cref{ConfigClass} for this.)
-
-Let's have a look at some usage examples.
-Say we have the program [[nytid]] that wants to use this config module and 
-subcommand.
-\begin{minted}{python}
-import typer
-import typerconf as config
-
-cli = typer.Typer()
-# add some other subcommands
-config.add_config_cmd(cli)
-\end{minted}
-
-We want the CLI command to have the following form when used with [[nytid]].
-\begin{minted}{bash}
-  nytid config courses.datintro22.schedule.url --set https://timeedit.net/...
-\end{minted}
-will set the configuration value at the path, whereas
-\begin{minted}{bash}
-  nytid config courses.datintro22.schedule.url
-\end{minted}
-will return it.
-
-Internally, [[nytid]]'s different parts can access the config through the 
-following API.
-\begin{minted}{python}
-import typerconf as config
-
-url = config.get("courses.datintro22.schedule.url")
-\end{minted}
-
-
 \section{Code outline}\label{configmodule}
 
 The base structure is standard.
 <<init.py>>=
-"""The nytid config command"""
+"""The typerconf module and config subcommand"""
 
 import appdirs
 import json
