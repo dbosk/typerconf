@@ -1,0 +1,49 @@
+\documentclass[a4paper,oneside]{article}
+\usepackage{abstract}
+\usepackage{noweb}
+% Needed to relax penalty for breaking code chunks across pages, otherwise 
+% there might be a lot of space following a code chunk.
+\def\nwendcode{\endtrivlist \endgroup}
+\let\nwdocspar=\smallbreak
+
+\usepackage[hyphens]{url}
+\usepackage{hyperref}
+\usepackage{authblk}
+
+\input{preamble.tex}
+
+\title{%
+  \texttt{typerconf}:
+  Reading, modifying and writing config files
+  for Typer-based CLIs
+}
+\author{%
+  Daniel Bosk
+}
+\affil{%
+  KTH EECS\\
+  \texttt{dbosk@kth.se}
+}
+
+\begin{document}
+\maketitle
+
+\begin{abstract}
+  \input{abstract.tex}
+\end{abstract}
+\clearpage
+
+\tableofcontents
+\clearpage
+
+
+\input{../src/typerconf/init.tex}
+
+
+\printbibliography
+
+
+\clearpage
+\vspace*{\fill}
+\VerbatimInput{../LICENSE}
+\end{document}

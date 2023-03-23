@@ -1,7 +1,14 @@
-\chapter{The [[cli.config]] module and subcommands}
+\section{Overview}\label{Overview}
 
-In this chapter, we document the [[config]] command of [[nytid]].
-This is located in the [[nytid.cli.config]] module.
+We provide a module, [[typerconf]], that can read, modify and write config 
+files.
+It's designed to easily provide a config to a program.
+It also provides a [[config]] command to a CLI written using Typer.
+
+This module was originally developed as a part of the [[nytid]] package (the 
+[[nytid.cli.config]] module), to provide a config management similar to that of 
+Git.
+Due to its usefulness, it has now been broken out into its own package.
 
 The configuration is a JSON structure.
 \label{ConfigStructure}
@@ -19,12 +26,28 @@ The configuration is a JSON structure.
   }
 }
 \end{minted}
+The format is actually irrelevant to anyone outside of this library, since it 
+will never be accessed directly anyway.
+But it will be used to illustrate the following.
+
 Then we can access values by dot-separated addresses.
 For instance, we can use [[courses.datintro22.schedule.url]] to access the 
 TimeEdit URL of the datintro22 course.
 (We'll use the class provided in \cref{ConfigClass} for this.)
 
-We want the command to have the following form:
+Let's have a look at some usage examples.
+Say we have the program [[nytid]] that wants to use this config module and 
+subcommand.
+\begin{minted}{python}
+import typer
+import typerconf as config
+
+cli = typer.Typer()
+# add some other subcommands
+config.add_config_cmd(cli)
+\end{minted}
+
+We want the CLI command to have the following form when used with [[nytid]].
 \begin{minted}{bash}
   nytid config courses.datintro22.schedule.url --set https://timeedit.net/...
 \end{minted}
@@ -33,6 +56,14 @@ will set the configuration value at the path, whereas
   nytid config courses.datintro22.schedule.url
 \end{minted}
 will return it.
+
+Internally, [[nytid]]'s different parts can access the config through the 
+following API.
+\begin{minted}{python}
+import typerconf as config
+
+url = config.get("courses.datintro22.schedule.url")
+\end{minted}
 
 
 \section{Code outline}\label{configmodule}
@@ -45,10 +76,11 @@ import appdirs
 import json
 import logging
 import os
+import sys
 import typer
 import typing
 
-dirs = appdirs.AppDirs("nytid", "dbosk@kth.se")
+<<set up appdirs dirs>>
 
 <<classes>>
 <<helper functions>>
@@ -62,28 +94,27 @@ if __name__ == "__main__":
 
 \subsection{Not using [[add_typer]]}
 
-We would like to use the structure outlined in \cref{CLIoverview}.
-However, that would require yet another subcommand, \eg
+With the design outlined in \cref{Overview}, we can't use the default way of 
+Typer ([[.add_typer]]), as that would require another level of subcommands:
 \begin{minted}{bash}
   nytid config get courses.datintro22.schedule.url
 \end{minted}
-to read out the value, which we don't want.
+to read out the value, but we don't want that [[get]] part in there.
 
 To work around that we need the [[cli]] object from the parent module here.
-Thus, instead of that module doing something like this
+Thus, instead of that module doing something like
 \begin{minted}{python}
-import nytid.config
+import typerconf as config
 # ...
-cli.add_typer(nytid.config.cli, name="config")
+cli.add_typer(config.cli, name="config")
 \end{minted}
-(As was outlined in \cref{CLIoverview}.)
-That module will actually have to do
+as is normally done with Typer, that module will actually have to do
 \begin{minted}{python}
-import nytid.config
+import typerconf as config
 # ...
-nytid.config.add_config_cmd(cli)
+config.add_config_cmd(cli)
 \end{minted}
-This gives us
+So we need to provide such a function.
 <<helper functions>>=
 def add_config_cmd(cli: typer.Typer):
   """
@@ -92,9 +123,10 @@ def add_config_cmd(cli: typer.Typer):
   <<config subcommands>>
 @
 
-To still make this module runnable on its own, in the same way as outlined in 
-\cref{CLIoverview}, we will create a [[cli]] object in the [[main]] function, 
-then add the config command and finally run it.
+To make this module runnable on its own (using [[main]]), we will create a 
+[[cli]] object in the [[main]] function, then add the config command and 
+finally run it.
+(This is exactly how a program would add the [[config]] subcommand.)
 <<main body>>=
 cli = typer.Typer()
 add_config_cmd(cli)
@@ -103,20 +135,34 @@ cli()
 
 \subsection{Testing}
 
-We also add tests.
-These are all prepended [[test_]] to the function name.
+We also want to test all functions we provide in this module.
+These test functions are all prepended [[test_]] to the function name.
 We will run them using [[pytest]].
-<<test cliconfig.py>>=
-from nytid.cli.config import *
+<<test init.py>>=
+from typerconf import *
 
 <<test functions>>
 @
 
 
+\section{Application directories}
+
+We use the application directory locations as provided by the [[appdirs]] 
+package.
+We automated the step with the application name by using the value of the 
+command run, \ie~[[sys.argv[0]]].
+(However, this default can be updated by just replacing the value of [[dirs]].)
+<<set up appdirs dirs>>=
+dirs = appdirs.AppDirs(sys.argv[0])
+@
+
+
 \section{Accessing the configuration: the [[get]] and [[set]] functions}
 
-We will provide two functions [[get]] and [[set]] that modifies the config, 
+We will provide two functions, [[get]] and [[set]], that modifies the config, 
 immediately syncing to the file system.
+This is the API to be used by any part of a program using this module to manage 
+the configuration.
 <<helper functions>>=
 def get(path: str = "") -> typing.Any:
   """
@@ -138,10 +184,9 @@ def set(path: str, values: typing.List[typing.Any]):
   <<write config back to file>>
 @
 
-Let's start with reading the config file.
+Let's start with reading and writing the config file.
 <<read config from file>>=
 conf = read_config()
-@ Whereas writing the file is the corresponding call.
 <<write config back to file>>=
 write_config(conf)
 @ We'll see these functions in \cref{ConfigFile}.
@@ -153,7 +198,7 @@ return conf.get(path)
 @
 
 Now, to set a value, we have several cases.
-If the use supplied more than one value, we want a list.
+If the user supplied more than one value, we want a list.
 If only one value, we don't want to store a list with only one value in it.
 Also, we want to try interpret any value as JSON.
 If that fails, we'll use the value as-is.
