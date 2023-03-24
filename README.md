@@ -1,6 +1,5 @@
 The configuration is a JSON structure. We'll use the following for the
-coming examples. [\[ConfigStructure\]]{#ConfigStructure
-label="ConfigStructure"}
+coming examples.
 
 ```JSON
 {
