@@ -71,9 +71,17 @@ We also want to test all functions we provide in this module.
 These test functions are all prepended [[test_]] to the function name.
 We will run them using [[pytest]].
 <<test init.py>>=
+import typer
 from typerconf import *
 
 <<test functions>>
+@
+
+Let's test the [[add_config_cmd]] function from above.
+<<test functions>>=
+def test_add_config_cmd():
+  cli = typer.Typer()
+  add_config_cmd(cli)
 @
 
 
@@ -364,7 +372,7 @@ Otherwise, it will print the current value at path.
 path_arg = typer.Argument(...,
                           help="Path in config, e.g. 'courses.datintro22'. "
                                "Empty string is root of config.",
-                          autocompletion=complete_path)
+                          autocompletion=complete_path_callback)
 value_arg = typer.Option([], "-s", "--set",
                          help="Values to store. "
                               "More than one value makes a list. "
@@ -384,7 +392,7 @@ def config_cmd(path: str = path_arg,
 
 \subsection{Autocompleting the path}
 
-The [[complete_path]] functions returns the possible completions for an 
+The [[complete_path]] function returns the possible completions for an 
 incomplete path from the command line.
 <<helper functions>>=
 def complete_path(initial_path: str, conf: Config = None):
@@ -416,6 +424,14 @@ def test_complete_path():
   assert "courses.datintro22.url" not in complete_path(incomplete, conf)
   assert len(complete_path(incomplete, conf)) >= 0
 @
+
+Now, the callback must not have any additional arguments, like we want that 
+[[conf]] argument for testing.
+<<helper functions>>=
+def complete_path_callback(initial_path: str):
+  return complete_path(initial_path)
+@
+
 
 \subsection{Printing the config}
 
