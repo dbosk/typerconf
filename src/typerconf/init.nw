@@ -74,6 +74,8 @@ We will run them using [[pytest]].
 import typer
 from typerconf import *
 
+<<test imports>>
+
 <<test functions>>
 @
 
@@ -165,7 +167,6 @@ The configuration file is stored in a suitable system location.
 For this we use the AppDirs package, we have the [[dirs]] instance above.
 We want to read the config and return a JSON structure as outlined above 
 (\cref{ConfigStructure}).
-And conversely, write one to the config file as well.
 <<helper functions>>=
 def read_config(conf_path=f"{dirs.user_config_dir}/config.json"):
   """
@@ -175,13 +176,17 @@ def read_config(conf_path=f"{dirs.user_config_dir}/config.json"):
   try:
     with open(conf_path) as conf_file:
       return Config(json.load(conf_file))
-  except FileNotFoundError:
-    logging.warning(f"Config file {conf_path} could not be found.")
-  except json.decoder.JSONDecodeError as err:
-    logging.warning(f"Config file {conf_path} could not be decoded: {err}")
+  <<handle read config file errors>>
 
   return Config()
+@
 
+And conversely, write one to the config file as well.
+Here it's important to use the [[os.makedirs]] (not [[os.mkdir]]) to create the 
+entire hierarchy of parent directories too, if they don't exist.
+We don't need any error handling for writing though, because all errors a 
+fatal, we can't recover from any of the possible errors.
+<<helper functions>>=
 def write_config(conf,
                  conf_path=f"{dirs.user_config_dir}/config.json"):
   """
@@ -190,10 +195,74 @@ def write_config(conf,
   """
   conf_dir = os.path.dirname(conf_path)
   if not os.path.isdir(conf_dir):
-    os.mkdir(conf_dir)
+    os.makedirs(conf_dir)
 
   with open(conf_path, "w") as conf_file:
     json.dump(conf.get(), conf_file)
+@
+
+When reading the config file there are some errors that can occur.
+The first is that the file doesn't exist ([[FileNotFoundError]]).
+There is also a related one, [[NotADirectoryError]].
+The problem of [[NotADirectoryError]] occurs when a file on the path is used as 
+a directory --- but only for reading, when trying to create a directory 
+hierarchy, it will yield [[FileExistsError]].
+We can't recover from this error, as an attempt to write to the file will also 
+fail.
+Finally, the file exists, but it's not proper JSON ([[JSONDecodeError]]).
+<<handle read config file errors>>=
+except FileNotFoundError as err:
+  logging.warning(f"Config file {conf_path} could not be found: {err}")
+except NotADirectoryError as err:
+  logging.error(f"A part of the path is a file, but used as directory: {err}")
+  raise err
+except json.decoder.JSONDecodeError as err:
+  logging.warning(f"Config file {conf_path} could not be decoded: {err}")
+@
+
+Now, let's test the read errors.
+<<test functions>>=
+def test_conf_read_errors():
+  """FileNotFoundError"""
+  conf = read_config("/this/path/should/never/exist/config.json")
+  """JSONDecodeError"""
+  conf = read_config("/dev/null")
+  """NotADirectoryError"""
+  try:
+    conf = read_config("/dev/null/config.json")
+  except NotADirectoryError:
+    assert True
+  else:
+    assert False
+@
+
+Writing to the config file can also yield errors.
+<<test functions>>=
+def test_conf_write_errors():
+  conf = Config({})
+  """Should succeed"""
+  write_config(conf, "/dev/null")
+  """Should yield FileExistsError"""
+  try:
+    write_config(conf, "/dev/null/config.json")
+  except NotADirectoryError:
+    assert False
+  except FileExistsError:
+    assert True
+  else:
+    assert False
+  """Should yield permission error"""
+  try:
+    write_config(conf, "/this/path/should/never/exist/config.json")
+  except PermissionError:
+    assert True
+  else:
+    assert False
+  """Should succeed"""
+  path = tempfile.mkdtemp()
+  write_config(conf, f"{path}/this/is/a/new/path/config.json")
+<<test imports>>=
+import tempfile
 @
 
 
