@@ -93,9 +93,14 @@ We use the application directory locations as provided by the [[appdirs]]
 package.
 We automated the step with the application name by using the value of the 
 command run, \ie~[[sys.argv[0]]].
-(However, this default can be updated by just replacing the value of [[dirs]].)
+
+Now, sometimes [[sys.argv[0]]] is an entire path.
+This will make [[appdirs]] use the path, instead of the path we want.
+So we will extract the basename and use that.
 <<set up appdirs dirs>>=
-dirs = appdirs.AppDirs(sys.argv[0])
+normalized_path = os.path.normpath(sys.argv[0])
+basename = os.path.basename(normalized_path)
+dirs = appdirs.AppDirs(basename)
 @
 
 
