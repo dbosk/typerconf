@@ -121,10 +121,13 @@ def get(path: str = "") -> typing.Any:
   <<read config from file>>
   <<return the value at path in config>>
 
-def set(path: str, values: typing.List[typing.Any]):
+def set(path: str, value: typing.Any):
   """
   Sets `value` at `path` in the config. `value` will be interpreted as JSON, if 
   conversion to JSON fails, it will be used as is.
+
+  If `value` is `None`, the entry referenced by `path` will be deleted, if it 
+  exists.
   """
   <<read config from file>>
   <<set the value at path in config>>
@@ -150,16 +153,27 @@ If only one value, we don't want to store a list with only one value in it.
 Also, we want to try interpret any value as JSON.
 If that fails, we'll use the value as-is.
 <<set the value at path in config>>=
-for i in range(len(values)):
+if isinstance(value, list):
+  <<try to convert each element to JSON>>
+  if len(value) == 1:
+    value = value[0]
+else:
   try:
-    values[i] = json.loads(values[i])
-  except json.decoder.JSONDecodeError:
+    value = json.loads(value)
+  except:
     pass
 
-if len(values) == 1:
-  values = values[0]
+conf.set(path, value)
+@
 
-conf.set(path, values)
+When we try to convert each element to JSON, we do it in place; hence iterate 
+over the index rather than the elements directly.
+<<try to convert each element to JSON>>=
+for i in range(len(value)):
+  try:
+    value[i] = json.loads(value[i])
+  except:
+    pass
 @
 
 Now let's cover [[read_config]], [[write_config]], [[set_path]] and 
@@ -312,7 +326,10 @@ class Config:
 
     Any part of the path that can be converted to an integer, will be converted 
     to an integer. This way we can access elements of lists too. However, we 
-    cannot create index 3 in a list if it doesn't exist.
+    cannot create index 3 in a list if it doesn't exist (we can't expand 
+    lists).
+
+    If `value` is `None`, the entry at `path` will be deleted, if it exists.
     """
     <<set value at path>>
 
@@ -350,7 +367,22 @@ def test_set_path():
   value = ["Asse", "Assa", "Asselina"]
   path = "courses.prgx22.TAs"
   conf.set(path, value)
-  assert len(conf.get(path)) == len(value)
+  gotten_value = conf.get(path)
+  assert isinstance(gotten_value, list)
+  assert len(gotten_value) == len(value)
+
+  value = {"A": 1, "B": 2}
+  conf.set("test", value)
+  gotten_value = conf.get("test")
+  assert value == gotten_value
+
+  conf.set("test", None)
+  try:
+    conf.get("test")
+  except KeyError:
+    assert True
+  else:
+    assert False
 
 def test_paths():
   assert "courses.datintro22.TAs" in conf.paths()
@@ -386,28 +418,60 @@ return structure
 To set a value is a bit more complex.
 We want to be able to specify a path and create all parents along the path if 
 they don't exist.
+However, if the value is [[None]], we don't want to create an entry that 
+doesn't exist, but we want to delete one if it already exists.
 <<set value at path>>=
 structure = self.__data
 
 parts = path.split(".")
-for part in parts[:-1]:
-  try:
-    part = int(part)
-  except ValueError:
-    pass
 
-  try:
-    structure = structure[part]
-  except KeyError:
-    structure[part] = {}
-    structure = structure[part]
+<<update structure to parent node, create parents if they don't exist>>
 
 part = parts[-1]
 try:
   part = int(part)
 except ValueError:
   pass
-structure[part] = value
+
+if value is None:
+  try:
+    del structure[part]
+  except KeyError:
+    pass
+else:
+  structure[part] = value
+@
+
+We want to traverse the tree, we want to go to the immediate parent of the leaf 
+that we want to set a value for (or delete).
+We iterate through the path.
+<<update structure to parent node, create parents if they don't exist>>=
+for part in parts[:-1]:
+  <<check if part is an integer, if so, convert it>>
+  try:
+    structure = structure[part]
+  except KeyError:
+    <<handle node that doesn't exist>>
+@
+
+To handle integers on the path, we do it in the pythonic way: we try to convert 
+it, if it fails, we just continue with the non-integer value.
+<<check if part is an integer, if so, convert it>>=
+try:
+  part = int(part)
+except ValueError:
+  pass
+@
+
+If a node along the path doesn't exist, we want to create it.
+However, if [[value]] is [[None]], we actually want to delete the leaf, then we 
+don't create the parents if they don't exist either.
+<<handle node that doesn't exist>>=
+if value is None:
+  return
+else:
+  structure[part] = {}
+  structure = structure[part]
 @
 
 \subsection{All existing paths}
