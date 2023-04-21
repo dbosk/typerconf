@@ -301,49 +301,12 @@ class Config:
     """
     self.__data = json_data
 
-  def get(self, path: str = "") -> typing.Any:
-    """
-    Returns object at `path`.
-    Example:
-    - `path = "courses.datintro22.url"` and
-    - Config contains `{"courses": {"datintro22": {"url": "https://..."}}}` 
-      will return "https://...".
-
-    Any part of the path that can be converted to an integer, will be converted 
-    to an integer. This way we can access elements of lists too.
-    """
-    <<get value at path>>
-
-  def set(self, path: str, value: typing.Any):
-    """
-    Sets `value` at `path`. Any parts along the path that don't exist will be 
-    created.
-
-    Example:
-    - `value = "https://..."`,
-    - `path = "courses.datintro22.url"`
-    will create `{"courses": {"datintro22": {"url": "https://..."}}}`.
-
-    Any part of the path that can be converted to an integer, will be converted 
-    to an integer. This way we can access elements of lists too. However, we 
-    cannot create index 3 in a list if it doesn't exist (we can't expand 
-    lists).
-
-    If `value` is `None`, the entry at `path` will be deleted, if it exists.
-    """
-    <<set value at path>>
-
-  def paths(self, from_root=""):
-    """
-    Returns all existing paths.
-
-    The optional argument `from_root` is a path and the method return all 
-    subpaths rooted at that point.
-    """
-    <<return list of all paths>>
+  <<Config methods for get and set>>
+  <<Config methods for available paths>>
+  <<Config methods for reading from and writing to file>>
 @
 
-We test these methods with the examples from the docstrings.
+We will use the following test data for the test functions.
 <<test functions>>=
 conf = Config({
   "courses": {
@@ -353,44 +316,46 @@ conf = Config({
     }
   }
 })
-
-def test_get_path():
-  assert conf.get("courses.datintro22.url") == "https://..."
-  assert conf.get("courses.datintro22.TAs.0") == "Asse"
-
-def test_set_path():
-  value = "Asselina"
-  path = "courses.datintro22.TAs.0"
-  conf.set(path, value)
-  assert conf.get(path) == value
-
-  value = ["Asse", "Assa", "Asselina"]
-  path = "courses.prgx22.TAs"
-  conf.set(path, value)
-  gotten_value = conf.get(path)
-  assert isinstance(gotten_value, list)
-  assert len(gotten_value) == len(value)
-
-  value = {"A": 1, "B": 2}
-  conf.set("test", value)
-  gotten_value = conf.get("test")
-  assert value == gotten_value
-
-  conf.set("test", None)
-  try:
-    conf.get("test")
-  except KeyError:
-    assert True
-  else:
-    assert False
-
-def test_paths():
-  assert "courses.datintro22.TAs" in conf.paths()
-  for path in conf.paths():
-    assert conf.get(path)
 @
 
-\subsection{Getting values}
+\subsection{Getting and setting values}
+
+We want to be able to get and set values at different paths in the config.
+<<Config methods for get and set>>=
+def get(self, path: str = "") -> typing.Any:
+  """
+  Returns object at `path`.
+  Example:
+  - `path = "courses.datintro22.url"` and
+  - Config contains `{"courses": {"datintro22": {"url": "https://..."}}}` 
+    will return "https://...".
+
+  Any part of the path that can be converted to an integer, will be converted 
+  to an integer. This way we can access elements of lists too.
+  """
+  <<get value at path>>
+
+def set(self, path: str, value: typing.Any):
+  """
+  Sets `value` at `path`. Any parts along the path that don't exist will be 
+  created.
+
+  Example:
+  - `value = "https://..."`,
+  - `path = "courses.datintro22.url"`
+  will create `{"courses": {"datintro22": {"url": "https://..."}}}`.
+
+  Any part of the path that can be converted to an integer, will be converted 
+  to an integer. This way we can access elements of lists too. However, we 
+  cannot create index 3 in a list if it doesn't exist (we can't expand 
+  lists).
+
+  If `value` is `None`, the entry at `path` will be deleted, if it exists.
+  """
+  <<set value at path>>
+@
+
+\subsubsection{Getting values}
 
 To get the value, we simply walk along the path and returns what remains.
 <<get value at path>>=
@@ -400,11 +365,7 @@ if not path:
   return structure
 
 for part in path.split("."):
-  try:
-    part = int(part)
-  except ValueError:
-    pass
-
+  <<check if part is an integer, if so, convert it>>
   try:
     structure = structure[part]
   except KeyError:
@@ -413,7 +374,28 @@ for part in path.split("."):
 return structure
 @
 
-\subsection{Setting values}
+We can test this as follows.
+<<test functions>>=
+def test_get_path():
+  assert conf.get("courses.datintro22.url") == "https://..."
+@
+
+To handle integers on the path, we do it in the pythonic way: we try to convert 
+it, if it fails, we just continue with the non-integer value.
+<<check if part is an integer, if so, convert it>>=
+try:
+  part = int(part)
+except ValueError:
+  pass
+@
+
+We can test this as follows.
+<<test functions>>=
+def test_get_path_int():
+  assert conf.get("courses.datintro22.TAs.0") == "Asse"
+@
+
+\subsubsection{Setting values}
 
 To set a value is a bit more complex.
 We want to be able to specify a path and create all parents along the path if 
@@ -428,18 +410,57 @@ parts = path.split(".")
 <<update structure to parent node, create parents if they don't exist>>
 
 part = parts[-1]
-try:
-  part = int(part)
-except ValueError:
-  pass
+<<check if part is an integer, if so, convert it>>
 
 if value is None:
-  try:
-    del structure[part]
-  except KeyError:
-    pass
+  <<remove part from the config>>
 else:
   structure[part] = value
+@
+
+We can test this as follows.
+<<test functions>>=
+def test_set_path_in_list():
+  value = "Asselina"
+  path = "courses.datintro22.TAs.0"
+  conf.set(path, value)
+  assert conf.get(path) == value
+
+def test_set_path_list():
+  value = ["Asse", "Assa", "Asselina"]
+  path = "courses.prgx22.TAs"
+  conf.set(path, value)
+  gotten_value = conf.get(path)
+  assert isinstance(gotten_value, list)
+  assert gotten_value == value
+@
+
+When we want to remove a node, the pythonic way is to simply try to remove it.
+If it doesn't exist, we silently fail.
+The reasoning is as follows: the goal is to remove something; if it doesn't 
+exist, we have already achieved our goal.
+(However, giving an error, as the rm(1) command does, helps in debugging.
+But we consider this silently failing most beneficial at the moment.)
+<<remove part from the config>>=
+try:
+  del structure[part]
+except KeyError:
+  pass
+@
+
+We can test this as follows.
+<<test functions>>=
+def test_set_path_remove():
+  conf.set("test", "test")
+  assert conf.get("test") == "test"
+
+  conf.set("test", None)
+  try:
+    conf.get("test")
+  except KeyError:
+    assert True
+  else:
+    assert False
 @
 
 We want to traverse the tree, we want to go to the immediate parent of the leaf 
@@ -454,15 +475,6 @@ for part in parts[:-1]:
     <<handle node that doesn't exist>>
 @
 
-To handle integers on the path, we do it in the pythonic way: we try to convert 
-it, if it fails, we just continue with the non-integer value.
-<<check if part is an integer, if so, convert it>>=
-try:
-  part = int(part)
-except ValueError:
-  pass
-@
-
 If a node along the path doesn't exist, we want to create it.
 However, if [[value]] is [[None]], we actually want to delete the leaf, then we 
 don't create the parents if they don't exist either.
@@ -474,10 +486,32 @@ else:
   structure = structure[part]
 @
 
-\subsection{All existing paths}
+We can test this as follows.
+<<test functions>>=
+def test_set_path_create_parents():
+  path = "test.some.nonexisting.parents"
+  value = {"A": 1, "B": 2}
+  conf.set(path, value)
+  gotten_value = conf.get(path)
+  assert value == gotten_value
+@
+
+\subsection{Listing all existing paths}
 
 Lastly, what we want to do is to create a list containing all paths in the 
 config.
+<<Config methods for available paths>>=
+def paths(self, from_root=""):
+  """
+  Returns all existing paths.
+
+  The optional argument `from_root` is a path and the method return all 
+  subpaths rooted at that point.
+  """
+  <<return list of all paths>>
+@
+
+What we want to do is to create a list containing all paths in the config.
 We will simply traverse the config tree and add paths as we go.
 We need to treat dictionaries and lists differently.
 And anything else is a leaf.
@@ -498,6 +532,14 @@ elif isinstance(root, list):
   paths += [f"{from_root}.{x}" for x in range(len(root))]
 
 return paths
+@
+
+We can test it like this.
+<<test functions>>=
+def test_paths():
+  assert "courses.datintro22.TAs" in conf.paths()
+  for path in conf.paths():
+    assert conf.get(path)
 @
 
 
