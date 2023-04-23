@@ -627,6 +627,9 @@ And we want it to print on the format of
 [[courses.datintro22.url = https://...]].
 This function will do a depth-first traversal through the config to print all 
 values.
+The idea is that the config path will move from the dictionary representation 
+in [[conf]] to the string representation in [[path]].
+When at the leaf, [[conf]] will contain the value and [[path]] the entire path.
 <<helper functions>>=
 def print_config(conf, path=""):
   """
@@ -635,10 +638,30 @@ def print_config(conf, path=""):
   """
   try:
     for key in conf.keys():
-      if path:
-        print_config(conf[key], f"{path}.{key}")
-      else:
-        print_config(conf[key], key)
-  except AttributeError:
-    print(f"{path} = {conf}")
+      <<recurse deeper into the config tree>>
+  <<print the leaf of config tree and return>>
 @
+
+The recursive step is quite straight-forward, we just call [[print_config]] 
+with the subtree ([[conf[key]]]) as an argument.
+However, we must check whether to prepend anything ([[path]]).
+The deeper we progress, the more we want to prepend.
+For instance, at the [[courses.datintro22]] level, [[print_config]] only knows 
+[[datintro22]], not the [[courses]] parent.
+Hence, we must supply [[courses]] to prepend to [[datintro22]] to get 
+[[courses.datintro22]].
+<<recurse deeper into the config tree>>=
+if path:
+  print_config(conf[key], f"{path}.{key}")
+else:
+  print_config(conf[key], key)
+@
+
+Finally, we get the base-case by exception.
+When a node ([[conf]]) doesn't have an attribute [[.keys()]], we know we're at 
+a leaf, so we print it.
+Then the complete path is in [[path]], the value in [[conf]].
+<<print the leaf of config tree and return>>=
+except AttributeError:
+  print(f"{path} = {conf}")
+
