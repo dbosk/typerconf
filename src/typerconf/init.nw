@@ -110,187 +110,6 @@ dirs = appdirs.AppDirs(basename)
 @
 
 
-\section{Accessing the configuration: the [[get]] and [[set]] functions}
-
-We will provide two functions, [[get]] and [[set]], that modifies the config, 
-immediately syncing to the file system.
-This is the API to be used by any part of a program using this module to manage 
-the configuration.
-<<helper functions>>=
-def get(path: str = "") -> typing.Any:
-  """
-  Returns the value stored at `path` in the config.
-
-  By default, `path = ""`, which returns the entire configuration as a Config 
-  object.
-  """
-  <<read config from file>>
-  <<return the value at path in config>>
-
-def set(path: str, value: typing.Any):
-  """
-  Sets `value` at `path` in the config. `value` will be interpreted as JSON, if 
-  conversion to JSON fails, it will be used as is.
-
-  If `value` is `None`, the entry referenced by `path` will be deleted, if it 
-  exists.
-  """
-  <<read config from file>>
-  <<set the value at path in config>>
-  <<write config back to file>>
-@
-
-Let's start with reading and writing the config file.
-<<read config from file>>=
-conf = read_config()
-<<write config back to file>>=
-write_config(conf)
-@ We'll see these functions in \cref{ConfigFile}.
-
-Now that we have the config structure in [[conf]] we can use it.
-Let's start with getting a value.
-<<return the value at path in config>>=
-return conf.get(path)
-@
-
-Now, to set a value, we have several cases.
-If the user supplied more than one value, we want a list.
-If only one value, we don't want to store a list with only one value in it.
-Also, we want to try interpret any value as JSON.
-If that fails, we'll use the value as-is.
-<<set the value at path in config>>=
-if isinstance(value, list):
-  <<try to convert each element to JSON>>
-  if len(value) == 1:
-    value = value[0]
-else:
-  try:
-    value = json.loads(value)
-  except:
-    pass
-
-conf.set(path, value)
-@
-
-When we try to convert each element to JSON, we do it in place; hence iterate 
-over the index rather than the elements directly.
-<<try to convert each element to JSON>>=
-for i in range(len(value)):
-  try:
-    value[i] = json.loads(value[i])
-  except:
-    pass
-@
-
-Now let's cover [[read_config]], [[write_config]], [[set_path]] and 
-[[get_path]] below.
-
-
-\section{Reading and writing the config file}\label{ConfigFile}
-
-The configuration file is stored in a suitable system location.
-For this we use the AppDirs package, we have the [[dirs]] instance above.
-We want to read the config and return a JSON structure as outlined above 
-(\cref{ConfigStructure}).
-<<helper functions>>=
-def read_config(conf_path=f"{dirs.user_config_dir}/config.json"):
-  """
-  Returns the config data structure (JSON).
-  `conf_path` is an optional argument providing the path to the config file.
-  """
-  try:
-    with open(conf_path) as conf_file:
-      return Config(json.load(conf_file))
-  <<handle read config file errors>>
-
-  return Config()
-@
-
-And conversely, write one to the config file as well.
-Here it's important to use the [[os.makedirs]] (not [[os.mkdir]]) to create the 
-entire hierarchy of parent directories too, if they don't exist.
-We don't need any error handling for writing though, because all errors a 
-fatal, we can't recover from any of the possible errors.
-<<helper functions>>=
-def write_config(conf,
-                 conf_path=f"{dirs.user_config_dir}/config.json"):
-  """
-  Stores the config data `conf` (extracts JSON) in the config file.
-  `conf_path` is an optional argument providing the path to the config file.
-  """
-  conf_dir = os.path.dirname(conf_path)
-  if not os.path.isdir(conf_dir):
-    os.makedirs(conf_dir)
-
-  with open(conf_path, "w") as conf_file:
-    json.dump(conf.get(), conf_file)
-@
-
-When reading the config file there are some errors that can occur.
-The first is that the file doesn't exist ([[FileNotFoundError]]).
-There is also a related one, [[NotADirectoryError]].
-The problem of [[NotADirectoryError]] occurs when a file on the path is used as 
-a directory --- but only for reading, when trying to create a directory 
-hierarchy, it will yield [[FileExistsError]].
-We can't recover from this error, as an attempt to write to the file will also 
-fail.
-Finally, the file exists, but it's not proper JSON ([[JSONDecodeError]]).
-<<handle read config file errors>>=
-except FileNotFoundError as err:
-  logging.warning(f"Config file {conf_path} could not be found: {err}")
-except NotADirectoryError as err:
-  logging.error(f"A part of the path is a file, but used as directory: {err}")
-  raise err
-except json.decoder.JSONDecodeError as err:
-  logging.warning(f"Config file {conf_path} could not be decoded: {err}")
-@
-
-Now, let's test the read errors.
-<<test functions>>=
-def test_conf_read_errors():
-  """FileNotFoundError"""
-  conf = read_config("/this/path/should/never/exist/config.json")
-  """JSONDecodeError"""
-  conf = read_config("/dev/null")
-  """NotADirectoryError"""
-  try:
-    conf = read_config("/dev/null/config.json")
-  except NotADirectoryError:
-    assert True
-  else:
-    assert False
-@
-
-Writing to the config file can also yield errors.
-<<test functions>>=
-def test_conf_write_errors():
-  conf = Config({})
-  """Should succeed"""
-  write_config(conf, "/dev/null")
-  """Should yield FileExistsError"""
-  try:
-    write_config(conf, "/dev/null/config.json")
-  except NotADirectoryError:
-    assert False
-  except FileExistsError:
-    assert True
-  else:
-    assert False
-  """Should yield permission error"""
-  try:
-    write_config(conf, "/this/path/should/never/exist/config.json")
-  except PermissionError:
-    assert True
-  else:
-    assert False
-  """Should succeed"""
-  path = tempfile.mkdtemp()
-  write_config(conf, f"{path}/this/is/a/new/path/config.json")
-<<test imports>>=
-import tempfile
-@
-
-
 \section{Navigating config structures}\label{ConfigClass}
 
 We provide the class [[Config]] to navigate the config structure.
@@ -546,6 +365,147 @@ def test_paths():
   assert "courses.datintro22.TAs" in conf.paths()
   for path in conf.paths():
     assert conf.get(path)
+@
+
+\subsection{Reading and writing the config file}\label{ConfigFile}
+
+The configuration file is stored in a suitable system location.
+We use the AppDirs package for the default location, we have the [[dirs]] 
+instance above.
+We want to read the config and load the JSON structure as outlined above 
+(\cref{ConfigStructure}).
+<<Config methods for reading from and writing to file>>=
+def read_config(self, conf_path=f"{dirs.user_config_dir}/config.json"):
+  """
+  Reads the config data structure (JSON) into the Config object.
+  `conf_path` is an optional argument providing the path to the config file.
+
+  <<documentation of config read error handling>>
+  """
+  try:
+    with open(conf_path) as conf_file:
+      self.__data = json.load(conf_file)
+      return
+  <<handle read config file errors>>
+@
+
+And conversely, write one to the config file as well.
+Here it's important to use the [[os.makedirs]] (not [[os.mkdir]]) to create the 
+entire hierarchy of parent directories too, if they don't exist.
+We don't need any error handling for writing though, because all errors are 
+fatal, we can't recover from any of the possible errors.
+<<Config methods for reading from and writing to file>>=
+def write_config(self, conf_path=f"{dirs.user_config_dir}/config.json"):
+  """
+  Stores the config data (as JSON) in the config file.
+  `conf_path` is an optional argument providing the path to the config file.
+  """
+  conf_dir = os.path.dirname(conf_path)
+  if not os.path.isdir(conf_dir):
+    os.makedirs(conf_dir)
+
+  with open(conf_path, "w") as conf_file:
+    json.dump(self.__data, conf_file)
+@
+
+When reading the config file there are some errors that can occur.
+The first is that the file doesn't exist ([[FileNotFoundError]]).
+There is also a related one, [[NotADirectoryError]].
+The problem of [[NotADirectoryError]] occurs when a file on the path is used as 
+a directory --- but only for reading, when trying to create a directory 
+hierarchy, it will yield [[FileExistsError]].
+We can't recover from this error, as an attempt to write to the file will also 
+fail.
+Finally, the file exists, but it's not proper JSON ([[JSONDecodeError]]).
+<<handle read config file errors>>=
+except FileNotFoundError as err:
+  logging.warning(f"Config file {conf_path} could not be found: {err}")
+except NotADirectoryError as err:
+  logging.error(f"A part of the path is a file, but used as directory: {err}")
+  raise err
+except json.decoder.JSONDecodeError as err:
+  logging.warning(f"Config file {conf_path} could not be decoded: {err}")
+@
+
+<<documentation of config read error handling>>=
+@
+
+Now, let's test the read errors.
+<<test functions>>=
+def test_conf_read_errors():
+  """FileNotFoundError"""
+  conf = Config()
+  conf.read_config("/this/path/should/never/exist/config.json")
+  """JSONDecodeError"""
+  conf.read_config("/dev/null")
+  """NotADirectoryError"""
+  try:
+    conf.read_config("/dev/null/config.json")
+  except NotADirectoryError:
+    assert True
+  else:
+    assert False
+@
+
+Writing to the config file can also yield errors.
+<<test functions>>=
+def test_conf_write_errors():
+  conf = Config({})
+  """Should succeed"""
+  conf.write_config("/dev/null")
+  """Should yield FileExistsError"""
+  try:
+    conf.write_config("/dev/null/config.json")
+  except NotADirectoryError:
+    assert False
+  except FileExistsError:
+    assert True
+  else:
+    assert False
+  """Should yield permission error"""
+  try:
+    conf.write_config("/this/path/should/never/exist/config.json")
+  except PermissionError:
+    assert True
+  else:
+    assert False
+  """Should succeed"""
+  path = tempfile.mkdtemp()
+  conf.write_config(f"{path}/this/is/a/new/path/config.json")
+<<test imports>>=
+import tempfile
+@
+
+
+\section{Accessing the default configuration:
+  the [[get]] and [[set]] functions}
+
+We will provide two module-level functions, [[get]] and [[set]], that allows 
+access to the default config, immediately syncing to the file system.
+<<helper functions>>=
+def get(path: str = "") -> typing.Any:
+  """
+  Returns the value stored at `path` in the config.
+
+  By default, `path = ""`, which returns the entire configuration as a Config 
+  object.
+  """
+  conf = Config()
+  conf.read_config()
+  return conf.get(path)
+
+def set(path: str, value: typing.Any):
+  """
+  Sets `value` at `path` in the config. `value` will be interpreted as JSON, if 
+  conversion to JSON fails, it will be used as is.
+
+  If `value` is `None`, the entry referenced by `path` will be deleted, if it 
+  exists.
+  """
+  conf = Config()
+  conf.read_config()
+  conf.set(path, value)
+  conf.write_config()
 @
 
 
