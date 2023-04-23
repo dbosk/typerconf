@@ -71,10 +71,16 @@ We also want to test all functions we provide in this module.
 These test functions are all prepended [[test_]] to the function name.
 We will run them using [[pytest]].
 <<test init.py>>=
+import sys
+sys.argv[0] = "typerconf"
+
 import typer
 from typerconf import *
 
 <<test imports>>
+
+cli = typer.Typer()
+add_config_cmd(cli)
 
 <<test functions>>
 @
@@ -565,10 +571,50 @@ def config_cmd(path: str = path_arg,
   Reads values from or writes values to the config.
   """
   if values:
+    <<change [[values]] to non-list if one-element list>>
     set(path, values)
   else:
     print_config(get(path), path)
 @
+
+If the user supplies only one argument on the command line, we don't want it to 
+be interpreted as a one-element list, but rather as a value that is not a list.
+Hence, we check and convert if necessary.
+<<change [[values]] to non-list if one-element list>>=
+if len(values) == 1:
+  values = values[0]
+@
+
+Let's test this command.
+<<test functions>>=
+runner = CliRunner()
+
+def test_cli():
+  # set example data
+  result = runner.invoke(cli,
+                         ["courses.datintro22.url", "--set", "https://..."])
+  assert result.exit_code == 0
+
+  # try access nonexisting
+  result = runner.invoke(cli, ["courses.datintro.url"])
+  assert result.exit_code == 1
+
+  # access existing
+  result = runner.invoke(cli, ["courses.datintro22.url"])
+  assert "courses.datintro22.url = https://..." in result.stdout
+
+  # clear config
+  result = runner.invoke(cli,
+                         ["courses", "--set", None])
+  assert result.exit_code == 0
+
+  # check that it's cleared
+  result = runner.invoke(cli, ["courses"])
+  assert "courses" not in result.stdout
+<<test imports>>=
+from typer.testing import CliRunner
+@
+
 
 \subsection{Autocompleting the path}
 
