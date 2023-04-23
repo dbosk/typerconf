@@ -518,7 +518,7 @@ Otherwise, it will print the current value at path.
 path_arg = typer.Argument(...,
                           help="Path in config, e.g. 'courses.datintro22'. "
                                "Empty string is root of config.",
-                          autocompletion=complete_path_callback)
+                          shell_complete=complete_path_callback)
 value_arg = typer.Option([], "-s", "--set",
                          help="Values to store. "
                               "More than one value makes a list. "
