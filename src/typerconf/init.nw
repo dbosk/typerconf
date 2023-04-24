@@ -5,6 +5,7 @@ The base structure is standard.
 """The typerconf module and config subcommand"""
 
 import appdirs
+import io
 import json
 import logging
 import os
@@ -133,14 +134,15 @@ class Config:
 
 We will use the following test data for the test functions.
 <<test functions>>=
-conf = Config({
+test_data = {
   "courses": {
     "datintro22": {
       "url": "https://...",
       "TAs": ["Asse", "Assa"]
     }
   }
-})
+}
+conf = Config(test_data)
 @
 
 \subsection{Getting and setting values}
@@ -369,76 +371,130 @@ def test_paths():
 
 \subsection{Reading and writing the config file}\label{ConfigFile}
 
+We want to be able to read a config file stored in the system.
+We have two cases.
+
+The first case is the default config file.
 The configuration file is stored in a suitable system location.
 We use the AppDirs package for the default location, we have the [[dirs]] 
 instance above.
 We want to read the config and load the JSON structure as outlined above 
 (\cref{ConfigStructure}).
+
+The second case is that we want to open another file of our liking.
+
+We will take the file as an argument.
+The default will be the path to the default config file.
+Then we can just specify a different path to open another file.
+However, sometimes we want to read from an already opened file, so we will also 
+accept anything that [[open]] would accept.
+
+\subsubsection{Reading the config}
+
+Let's start with reading.
 <<Config methods for reading from and writing to file>>=
-def read_config(self, conf_path=f"{dirs.user_config_dir}/config.json"):
+def read_config(self, conf_file=f"{dirs.user_config_dir}/config.json"):
   """
   Reads the config data structure (JSON) into the Config object.
-  `conf_path` is an optional argument providing the path to the config file.
+  <<[[conf_file]] argument doc>>
 
   <<documentation of config read error handling>>
   """
-  try:
-    with open(conf_path) as conf_file:
-      self.__data = json.load(conf_file)
-      return
-  <<handle read config file errors>>
+  if isinstance(conf_file, str) or isinstance(conf_file, int):
+    <<open the config file>>
+  elif isinstance(conf_file, io.IOBase):
+    <<read the data into [[self.__data]]>>
+  else:
+    raise TypeError(f"Unsupported type for `conf_file` argument: "
+                    f"{type(conf_file)}")
+<<[[conf_file]] argument doc>>=
+`conf_file` is an optional argument providing one of the following:
+- a string, which is the path to the config file;
+- an integer, which is a file descriptor (see `os.open`);
+- an already opened file object (anything derived from `io.IOBase`, including 
+  `io.StringIO`).
 @
 
-And conversely, write one to the config file as well.
-Here it's important to use the [[os.makedirs]] (not [[os.mkdir]]) to create the 
-entire hierarchy of parent directories too, if they don't exist.
-We don't need any error handling for writing though, because all errors are 
-fatal, we can't recover from any of the possible errors.
-<<Config methods for reading from and writing to file>>=
-def write_config(self, conf_path=f"{dirs.user_config_dir}/config.json"):
-  """
-  Stores the config data (as JSON) in the config file.
-  `conf_path` is an optional argument providing the path to the config file.
-  """
-  conf_dir = os.path.dirname(conf_path)
-  if not os.path.isdir(conf_dir):
-    os.makedirs(conf_dir)
-
-  with open(conf_path, "w") as conf_file:
-    json.dump(self.__data, conf_file)
+Let's start with the short one.
+To read the data, we simply use the [[json]] library to turn the file contents 
+into a dictionary.
+<<read the data into [[self.__data]]>>=
+self.__data = json.load(conf_file)
 @
+
+If we must open the file ourselves, we simply do that.
+But we do it in such a way that we can reuse
+[[<<read the data into [[self.__data]]>>]].
+<<open the config file>>=
+try:
+  with open(conf_file) as conf_file:
+    <<read the data into [[self.__data]]>>
+    return
+<<handle read config file errors>>
+@
+
+Let's test this functionality.
+<<test functions>>=
+def test_read_config():
+  tmp = tempfile.mkdtemp()
+  tmp_conf = f"{tmp}/config.json"
+  with open(tmp_conf, "w") as conf_file:
+    json.dump(test_data, conf_file)
+
+  conf = Config()
+  conf.read_config(tmp_conf)
+  assert "https://..." in conf.get("courses.datintro22.url")
+
+  conf = Config()
+  with open(tmp_conf) as conf_file:
+    conf.read_config(conf_file)
+  assert "https://..." in conf.get("courses.datintro22.url")
+<<test imports>>=
+import tempfile
+@
+
+\subsubsection{Reading errors}
 
 When reading the config file there are some errors that can occur.
-The first is that the file doesn't exist ([[FileNotFoundError]]).
-There is also a related one, [[NotADirectoryError]].
-The problem of [[NotADirectoryError]] occurs when a file on the path is used as 
-a directory --- but only for reading, when trying to create a directory 
-hierarchy, it will yield [[FileExistsError]].
-We can't recover from this error, as an attempt to write to the file will also 
-fail.
-Finally, the file exists, but it's not proper JSON ([[JSONDecodeError]]).
+We catch them and rephrase the error messages.
+We turn the [[json.JSONDecodeError]] into a [[ValueError]] too.
+<<documentation of config read error handling>>=
+Errors:
+
+- The first is that the file doesn't exist ([[FileNotFoundError]]).
+- There is also a related one, [[NotADirectoryError]]. The problem of 
+  [[NotADirectoryError]] occurs when a file on the path is used as a directory 
+  --- but only for reading, when trying to create a directory hierarchy, it 
+  will yield [[FileExistsError]]. We can't recover from this error, as an 
+  attempt to write to the file will also fail.
+- Finally, the file exists, but it's not proper JSON ([[JSONDecodeError]]).
 <<handle read config file errors>>=
 except FileNotFoundError as err:
-  logging.warning(f"Config file {conf_path} could not be found: {err}")
+  raise FileNotFoundError(f"Config file {conf_file} could not be found: {err}")
 except NotADirectoryError as err:
-  logging.error(f"A part of the path is a file, but used as directory: {err}")
-  raise err
+  raise NotADirectoryError(f"A part of the path is a file, "
+                           f"but used as directory: {err}")
 except json.decoder.JSONDecodeError as err:
-  logging.warning(f"Config file {conf_path} could not be decoded: {err}")
-@
-
-<<documentation of config read error handling>>=
+  raise ValueError(f"Config file {conf_file} "
+                   f"could not be decoded: {err}")
 @
 
 Now, let's test the read errors.
 <<test functions>>=
 def test_conf_read_errors():
-  """FileNotFoundError"""
   conf = Config()
-  conf.read_config("/this/path/should/never/exist/config.json")
-  """JSONDecodeError"""
-  conf.read_config("/dev/null")
-  """NotADirectoryError"""
+  try:
+    conf.read_config("/this/path/should/never/exist/config.json")
+  except FileNotFoundError:
+    assert True
+  else:
+    assert False
+  try:
+    conf.read_config("/dev/null")
+  except ValueError:
+    assert True
+  else:
+    assert False
   try:
     conf.read_config("/dev/null/config.json")
   except NotADirectoryError:
@@ -447,12 +503,60 @@ def test_conf_read_errors():
     assert False
 @
 
+\subsubsection{Writing the config}
+
+Conversely, we want to write the data to the config file as well.
+We do the same things as above, but open for writing instead.
+<<Config methods for reading from and writing to file>>=
+def write_config(self, conf_file=f"{dirs.user_config_dir}/config.json"):
+  """
+  Stores the config data (as JSON) in the config file.
+  <<[[conf_file]] argument doc>>
+  """
+  if isinstance(conf_file, str) or isinstance(conf_file, int):
+    <<open the config file for writing>>
+  elif isinstance(conf_file, io.IOBase):
+    <<write the data from [[self.__data]]>>
+  else:
+    raise TypeError(f"Unsupported type for `conf_file` argument: "
+                    f"{type(conf_file)}")
+@
+
+Writing to the file is simply to use [[json.dump]].
+<<write the data from [[self.__data]]>>=
+json.dump(self.__data, conf_file)
+@
+
+Now, how do we open the file?
+We want to create the file if it doesn't exist.
+Here it's important to use the [[os.makedirs]] (not [[os.mkdir]]) to create the 
+entire hierarchy of parent directories too, if they don't exist.
+We don't need any error handling for writing though, because all errors are 
+fatal, we can't recover from any of the possible errors.
+<<open the config file for writing>>=
+conf_dir = os.path.dirname(conf_file)
+if not os.path.isdir(conf_dir):
+  os.makedirs(conf_dir)
+
+with open(conf_file, "w") as conf_file:
+  <<write the data from [[self.__data]]>>
+@
+
+Let's test this.
+<<test functions>>=
+def test_write_config():
+  conf = Config(test_data)
+  conf.write_config("/dev/null")
+  with open("/dev/null", "w") as conf_file:
+    conf.write_config(conf_file)
+  with open(os.open("/dev/null", os.O_WRONLY), "w") as conf_file:
+    conf.write_config(conf_file)
+@
+
 Writing to the config file can also yield errors.
 <<test functions>>=
 def test_conf_write_errors():
   conf = Config({})
-  """Should succeed"""
-  conf.write_config("/dev/null")
   """Should yield FileExistsError"""
   try:
     conf.write_config("/dev/null/config.json")
@@ -472,8 +576,6 @@ def test_conf_write_errors():
   """Should succeed"""
   path = tempfile.mkdtemp()
   conf.write_config(f"{path}/this/is/a/new/path/config.json")
-<<test imports>>=
-import tempfile
 @
 
 
