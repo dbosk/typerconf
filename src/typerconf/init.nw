@@ -392,6 +392,8 @@ accept anything that [[open]] would accept.
 \subsubsection{Reading the config}
 
 Let's start with reading.
+Anything that is derived from [[io.IOBase]] is already opened.
+Anything else, we pass to [[open]] to handle.
 <<Config methods for reading from and writing to file>>=
 def read_config(self, conf_file=f"{dirs.user_config_dir}/config.json"):
   """
@@ -400,19 +402,16 @@ def read_config(self, conf_file=f"{dirs.user_config_dir}/config.json"):
 
   <<documentation of config read error handling>>
   """
-  if isinstance(conf_file, str) or isinstance(conf_file, int):
-    <<open the config file>>
-  elif isinstance(conf_file, io.IOBase):
+  if isinstance(conf_file, io.IOBase):
     <<read the data into [[self.__data]]>>
   else:
-    raise TypeError(f"Unsupported type for `conf_file` argument: "
-                    f"{type(conf_file)}")
+    <<open and read the config file>>
 <<[[conf_file]] argument doc>>=
 `conf_file` is an optional argument providing one of the following:
-- a string, which is the path to the config file;
-- an integer, which is a file descriptor (see `os.open`);
-- an already opened file object (anything derived from `io.IOBase`, including 
-  `io.StringIO`).
+- an already opened file object (anything derived from `io.IOBase`);
+- anything that `open` can handle, for instance:
+  - a string, which is the path to the config file;
+  - an integer, which is a file descriptor (see `os.open`).
 @
 
 Let's start with the short one.
@@ -425,7 +424,7 @@ self.__data = json.load(conf_file)
 If we must open the file ourselves, we simply do that.
 But we do it in such a way that we can reuse
 [[<<read the data into [[self.__data]]>>]].
-<<open the config file>>=
+<<open and read the config file>>=
 try:
   with open(conf_file) as conf_file:
     <<read the data into [[self.__data]]>>
@@ -513,13 +512,10 @@ def write_config(self, conf_file=f"{dirs.user_config_dir}/config.json"):
   Stores the config data (as JSON) in the config file.
   <<[[conf_file]] argument doc>>
   """
-  if isinstance(conf_file, str) or isinstance(conf_file, int):
-    <<open the config file for writing>>
-  elif isinstance(conf_file, io.IOBase):
+  if isinstance(conf_file, io.IOBase):
     <<write the data from [[self.__data]]>>
   else:
-    raise TypeError(f"Unsupported type for `conf_file` argument: "
-                    f"{type(conf_file)}")
+    <<open and write the config file>>
 @
 
 Writing to the file is simply to use [[json.dump]].
@@ -533,7 +529,7 @@ Here it's important to use the [[os.makedirs]] (not [[os.mkdir]]) to create the
 entire hierarchy of parent directories too, if they don't exist.
 We don't need any error handling for writing though, because all errors are 
 fatal, we can't recover from any of the possible errors.
-<<open the config file for writing>>=
+<<open and write the config file>>=
 conf_dir = os.path.dirname(conf_file)
 if not os.path.isdir(conf_dir):
   os.makedirs(conf_dir)
