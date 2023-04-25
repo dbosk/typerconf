@@ -457,19 +457,25 @@ import tempfile
 When reading the config file there are some errors that can occur.
 We catch them and rephrase the error messages.
 We turn the [[json.JSONDecodeError]] into a [[ValueError]] too.
+Let's summarize in the API documentation.
 <<documentation of config read error handling>>=
 Errors:
 
-- The first is that the file doesn't exist ([[FileNotFoundError]]).
+- The first is that the file doesn't exist ([[FileNotFoundError]]). We silently 
+  fail this error. The reason is that the file doesn't exist, which means it's 
+  an empty config. We fail silently as a later write would succeed.
 - There is also a related one, [[NotADirectoryError]]. The problem of 
   [[NotADirectoryError]] occurs when a file on the path is used as a directory 
   --- but only for reading, when trying to create a directory hierarchy, it 
   will yield [[FileExistsError]]. We can't recover from this error, as an 
-  attempt to write to the file will also fail.
-- Finally, the file exists, but it's not proper JSON ([[JSONDecodeError]]).
+  attempt to write to the file will also fail. We will reraise the exception 
+  with a better error message.
+- Finally, the file exists, but it's not proper JSON ([[JSONDecodeError]]). 
+  This is also a fatal error, we don't want a subsequent write to overwrite a 
+  corrupted config. We reraise the exception with a better error message.
 <<handle read config file errors>>=
 except FileNotFoundError as err:
-  raise FileNotFoundError(f"Config file {conf_file} could not be found: {err}")
+  pass
 except NotADirectoryError as err:
   raise NotADirectoryError(f"A part of the path is a file, "
                            f"but used as directory: {err}")
@@ -482,18 +488,21 @@ Now, let's test the read errors.
 <<test functions>>=
 def test_conf_read_errors():
   conf = Config()
+
   try:
     conf.read_config("/this/path/should/never/exist/config.json")
   except FileNotFoundError:
-    assert True
-  else:
     assert False
+  else:
+    assert True
+
   try:
     conf.read_config("/dev/null")
   except ValueError:
     assert True
   else:
     assert False
+
   try:
     conf.read_config("/dev/null/config.json")
   except NotADirectoryError:
