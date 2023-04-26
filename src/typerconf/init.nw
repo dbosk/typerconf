@@ -721,7 +721,7 @@ def test_complete_path():
 Now, the callback must not have any additional arguments, like we want that 
 [[conf]] argument for testing.
 <<helper functions>>=
-def complete_path_callback(initial_path: str):
+def complete_path_callback(ctx, param, initial_path: str):
   return complete_path(initial_path)
 @
 
