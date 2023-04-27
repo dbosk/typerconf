@@ -639,6 +639,7 @@ def config_cmd(path: str = path_arg,
   """
   if values:
     <<change [[values]] to non-list if one-element list>>
+    <<if [[values]] is empty string, replace it with [[None]]>>
     set(path, values)
   else:
     print_config(get(path), path)
@@ -650,6 +651,13 @@ Hence, we check and convert if necessary.
 <<change [[values]] to non-list if one-element list>>=
 if len(values) == 1:
   values = values[0]
+@
+
+Additionally, if that one element is an empty string, we replace it with 
+[[None]] to trigger a delete.
+<<if [[values]] is empty string, replace it with [[None]]>>=
+if values == "":
+  values = None
 @
 
 Let's test this command.
