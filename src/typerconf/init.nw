@@ -625,7 +625,7 @@ Otherwise, it will print the current value at path.
 path_arg = typer.Argument(...,
                           help="Path in config, e.g. 'courses.datintro22'. "
                                "Empty string is root of config.",
-                          shell_complete=complete_path_callback)
+                          autocompletion=complete_path_callback)
 value_arg = typer.Option([], "-s", "--set",
                          help="Values to store. "
                               "More than one value makes a list. "
@@ -729,9 +729,7 @@ def test_complete_path():
 Now, the callback must not have any additional arguments, like we want that 
 [[conf]] argument for testing.
 <<helper functions>>=
-def complete_path_callback(ctx: typer.Context,
-                           args: typing.List[str],
-                           initial_path: str):
+def complete_path_callback(initial_path: str):
   return complete_path(initial_path)
 @
 
