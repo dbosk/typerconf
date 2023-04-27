@@ -704,8 +704,8 @@ def complete_path(initial_path: str, conf: Config = None):
   if not conf:
     conf = Config(get())
 
-  return list(filter(lambda x: x.startswith(initial_path),
-                     conf.paths()))
+  return filter(lambda x: x.startswith(initial_path),
+                conf.paths())
 @
 
 We test this function as follows.
