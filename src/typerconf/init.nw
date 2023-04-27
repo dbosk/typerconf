@@ -773,7 +773,7 @@ def test_complete_path():
   incomplete = "courses.datintro22.T"
   assert "courses.datintro22.TAs" in complete_path(incomplete, conf)
   assert "courses.datintro22.url" not in complete_path(incomplete, conf)
-  assert len(complete_path(incomplete, conf)) >= 0
+  assert len(list(complete_path(incomplete, conf))) >= 0
 @
 
 Now, the callback must not have any additional arguments, like we want that 
