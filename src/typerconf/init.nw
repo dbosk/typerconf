@@ -614,8 +614,6 @@ config was read from.
 However, since we don't always want this, we will make it optional.
 
 We will start with the constructor of the [[Config]] class.
-<<Config constructor args>>=
-conf_file=None
 <<Config constructor args doc>>=
 `conf_file` takes a path to a file which will be used as a config file. If this 
 argument is supplied, the data will be read from the file.
@@ -625,13 +623,34 @@ that any changes (invokations of the `.set` method) will be written to the
 config file immediately.
 
 To not enable write back, load file contents with the `.read_config` method.
+<<Config constructor args>>=
+conf_file=None
 @
 
-If the file is supplied, we simply call the [[.read_config]] method.
+If we get a file, we simply call the [[.read_config]] method to load the data 
+into [[self.__data]].
 <<Config attributes>>=
-self.__conf_file = conf_file
+<<set [[self.__conf_file]] based on [[conf_file]]>>
+
 if self.__conf_file:
-  self.read_config(conf_file)
+  self.read_config(self.__conf_file)
+@
+
+If [[conf_file]] is a file-like object, we must extract the name of the file.
+This is so that we can reopen it in write mode when we want to do the write 
+back.
+If it doesn't have a name (attribute), then we raise an exception.
+If not a file-like object, we assume it's a path that can be passed directly to 
+[[open]].
+<<set [[self.__conf_file]] based on [[conf_file]]>>=
+if isinstance(conf_file, io.IOBase):
+  try:
+    self.__conf_file = conf_file.name
+  except AttributeError:
+    raise ValueError(f"can't enable writeback when `conf_file` is "
+                     f"a file-like object without a name: {conf_file}")
+else:
+  self.__conf_file = conf_file
 @
 
 We also want the corresponding write call in the [[.set]] method to actually 
@@ -654,20 +673,21 @@ written to the file.
 <<test functions>>=
 def test_writeback_constructor():
   with tempfile.NamedTemporaryFile("w") as tmp_conf_file:
+    tmp_conf_file_name = "/tmp/writeback" #tmp_conf_file.name
     path = "the.path"
     first_value = "1st"
     second_value = "2nd"
 
     initial_conf = Config()
     initial_conf.set(path, first_value)
-    initial_conf.write_config(tmp_conf_file.name)
+    initial_conf.write_config(tmp_conf_file_name)
 
-    conf = Config(tmp_conf_file.name)
+    conf = Config(conf_file=tmp_conf_file_name)
     assert conf.get(path) == first_value
     conf.set(path, second_value)
 
     last_conf = Config()
-    last_conf.read_config(tmp_conf_file.name)
+    last_conf.read_config(tmp_conf_file_name)
     assert last_conf.get(path) == second_value
 <<test imports>>=
 import tempfile
@@ -689,10 +709,7 @@ Note that write back cannot be enabled with already opened files (as the mode
 is already fixed).
 <<additional [[read_config]] args processing>>=
 if writeback:
-  if isinstance(conf_file, io.IOBase):
-    raise ValueError(f"can't enable writeback when `conf_file` is "
-                     f"an already opened file: {conf_file}")
-  self.__conf_file = conf_file
+  <<set [[self.__conf_file]] based on [[conf_file]]>>
 @
 
 We test this in a similar fashion as before.
@@ -700,21 +717,22 @@ However, now we will use the [[.read_config]] method to set the write back.
 <<test functions>>=
 def test_writeback_read_config():
   with tempfile.NamedTemporaryFile("w") as tmp_conf_file:
+    tmp_conf_file_name = "/tmp/writeback" #tmp_conf_file.name
     path = "the.path"
     first_value = "1st"
     second_value = "2nd"
 
     initial_conf = Config()
     initial_conf.set(path, first_value)
-    initial_conf.write_config(tmp_conf_file.name)
+    initial_conf.write_config(tmp_conf_file_name)
 
     conf = Config()
-    conf.read_config(tmp_conf_file.name, writeback=True)
+    conf.read_config(tmp_conf_file_name, writeback=True)
     assert conf.get(path) == first_value
     conf.set(path, second_value)
 
     last_conf = Config()
-    last_conf.read_config(tmp_conf_file.name)
+    last_conf.read_config(tmp_conf_file_name)
     assert last_conf.get(path) == second_value
 @
 
