@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "typerconf"
-version = "1.11"
+version = "1.12"
 description = "Library to read and write configs using API and CLI with Typer"
 authors = ["Daniel Bosk <daniel@bosk.se>"]
 license = "MIT"
