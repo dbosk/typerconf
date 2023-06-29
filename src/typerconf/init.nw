@@ -123,11 +123,15 @@ Both work with these dot-separated addresses.
 class Config:
   """Navigates nested JSON structures by dot-separated addressing."""
 
-  def __init__(self, json_data={}):
+  def __init__(self, json_data={},
+                     <<Config constructor args>>):
     """
     Constructs a config object to navigate from JSON data `json_data`.
+
+    <<Config constructor args doc>>
     """
     self.__data = json_data
+    <<Config attributes>>
 
   <<Config methods for get and set>>
   <<Config methods for available paths>>
@@ -150,6 +154,11 @@ conf = Config(test_data)
 \subsection{Getting and setting values}
 
 We want to be able to get and set values at different paths in the config.
+We'll provide methods [[.get]] and [[.set]] for this.
+
+\subsubsection{Getting values}
+
+The get method looks like this.
 <<Config methods for get and set>>=
 def get(self, path: str = "") -> typing.Any:
   """
@@ -163,28 +172,13 @@ def get(self, path: str = "") -> typing.Any:
   to an integer. This way we can access elements of lists too.
   """
   <<get value at path>>
-
-def set(self, path: str, value: typing.Any):
-  """
-  Sets `value` at `path`. Any parts along the path that don't exist will be 
-  created.
-
-  Example:
-  - `value = "https://..."`,
-  - `path = "courses.datintro22.url"`
-  will create `{"courses": {"datintro22": {"url": "https://..."}}}`.
-
-  Any part of the path that can be converted to an integer, will be converted 
-  to an integer. This way we can access elements of lists too. However, we 
-  cannot create index 3 in a list if it doesn't exist (we can't expand 
-  lists).
-
-  If `value` is `None`, the entry at `path` will be deleted, if it exists.
-  """
-  <<set value at path>>
 @
 
-\subsubsection{Getting values}
+We can test this as follows, using the config data defined above.
+<<test functions>>=
+def test_get_path():
+  assert conf.get("courses.datintro22.url") == "https://..."
+@
 
 To get the value, we simply walk along the path and returns what remains.
 <<get value at path>>=
@@ -203,12 +197,6 @@ for part in path.split("."):
 return structure
 @
 
-We can test this as follows.
-<<test functions>>=
-def test_get_path():
-  assert conf.get("courses.datintro22.url") == "https://..."
-@
-
 To handle integers on the path, we do it in the pythonic way: we try to convert 
 it, if it fails, we just continue with the non-integer value.
 <<check if part is an integer, if so, convert it>>=
@@ -225,6 +213,32 @@ def test_get_path_int():
 @
 
 \subsubsection{Setting values}
+
+The set method is analogous to the get method, just it's inverse of sorts.
+However, it has a write back feature that we will discuss in \cref{writeback}.
+<<Config methods for get and set>>=
+def set(self, path: str, value: typing.Any):
+  """
+  Sets `value` at `path`. Any parts along the path that don't exist will be 
+  created.
+
+  Example:
+  - `value = "https://..."`,
+  - `path = "courses.datintro22.url"`
+  will create `{"courses": {"datintro22": {"url": "https://..."}}}`.
+
+  Any part of the path that can be converted to an integer, will be converted 
+  to an integer. This way we can access elements of lists too. However, we 
+  cannot create index 3 in a list if it doesn't exist (we can't expand 
+  lists).
+
+  If `value` is `None`, the entry at `path` will be deleted, if it exists.
+
+  <<set writeback doc>>
+  """
+  <<set value at path>>
+  <<set writeback code>>
+@
 
 To set a value is a bit more complex.
 We want to be able to specify a path and create all parents along the path if 
@@ -397,10 +411,14 @@ Let's start with reading.
 Anything that is derived from [[io.IOBase]] is already opened.
 Anything else, we pass to [[open]] to handle.
 <<Config methods for reading from and writing to file>>=
-def read_config(self, conf_file=f"{dirs.user_config_dir}/config.json"):
+def read_config(self, conf_file=f"{dirs.user_config_dir}/config.json",
+                      <<additional [[read_config]] args>>):
   """
   Reads the config data structure (JSON) into the Config object.
+
   <<[[conf_file]] argument doc>>
+
+  <<additional [[read_config]] args doc>>
 
   <<documentation of config read error handling>>
   """
@@ -408,6 +426,8 @@ def read_config(self, conf_file=f"{dirs.user_config_dir}/config.json"):
     <<read the data into [[self.__data]]>>
   else:
     <<open and read the config file>>
+
+  <<additional [[read_config]] args processing>>
 <<[[conf_file]] argument doc>>=
 `conf_file` is an optional argument providing one of the following:
 - an already opened file object (anything derived from `io.IOBase`);
@@ -430,7 +450,6 @@ But we do it in such a way that we can reuse
 try:
   with open(conf_file) as conf_file:
     <<read the data into [[self.__data]]>>
-    return
 <<handle read config file errors>>
 @
 
@@ -463,18 +482,18 @@ Let's summarize in the API documentation.
 <<documentation of config read error handling>>=
 Errors:
 
-- The first is that the file doesn't exist ([[FileNotFoundError]]). We silently 
+- The first is that the file doesn't exist (FileNotFoundError). We silently 
   fail this error. The reason is that the file doesn't exist, which means it's 
   an empty config. We fail silently as a later write would succeed.
-- There is also a related one, [[NotADirectoryError]]. The problem of 
-  [[NotADirectoryError]] occurs when a file on the path is used as a directory 
-  --- but only for reading, when trying to create a directory hierarchy, it 
-  will yield [[FileExistsError]]. We can't recover from this error, as an 
-  attempt to write to the file will also fail. We will reraise the exception 
-  with a better error message.
-- Finally, the file exists, but it's not proper JSON ([[JSONDecodeError]]). 
-  This is also a fatal error, we don't want a subsequent write to overwrite a 
-  corrupted config. We reraise the exception with a better error message.
+- There is also a related one, NotADirectoryError. The problem of 
+  NotADirectoryError occurs when a file on the path is used as a directory --- 
+  but only for reading, when trying to create a directory hierarchy, it will 
+  yield FileExistsError. We can't recover from this error, as an attempt to 
+  write to the file will also fail. We will reraise the exception with a better 
+  error message.
+- Finally, the file exists, but it's not proper JSON (JSONDecodeError). This is 
+  also a fatal error, we don't want a subsequent write to overwrite a corrupted 
+  config. We reraise the exception with a better error message.
 <<handle read config file errors>>=
 except FileNotFoundError as err:
   pass
@@ -583,6 +602,138 @@ def test_conf_write_errors():
   """Should succeed"""
   path = tempfile.mkdtemp()
   conf.write_config(f"{path}/this/is/a/new/path/config.json")
+@
+
+
+\subsection{Writing back the changed config to file}\label{writeback}
+
+In some cases, when we read a config file and change it, we want to write the 
+changed back to the file we originally read.
+We will achieve that by letting the [[Config]] class remember the file the 
+config was read from.
+However, since we don't always want this, we will make it optional.
+
+We will start with the constructor of the [[Config]] class.
+<<Config constructor args doc>>=
+`conf_file` takes a path to a file which will be used as a config file. If this 
+argument is supplied, the data will be read from the file.
+
+Also, if `conf_file` is not None, we will enable automatic write back. So 
+that any changes (invokations of the `.set` method) will be written to the 
+config file immediately.
+
+To not enable write back, load file contents with the `.read_config` method.
+<<Config constructor args>>=
+conf_file=None
+@
+
+If we get a file, we simply call the [[.read_config]] method to load the data 
+into [[self.__data]].
+<<Config attributes>>=
+<<set [[self.__conf_file]] based on [[conf_file]]>>
+
+if self.__conf_file:
+  self.read_config(self.__conf_file)
+@
+
+If [[conf_file]] is a file-like object, we must extract the name of the file.
+This is so that we can reopen it in write mode when we want to do the write 
+back.
+If it doesn't have a name (attribute), then we raise an exception.
+If not a file-like object, we assume it's a path that can be passed directly to 
+[[open]].
+<<set [[self.__conf_file]] based on [[conf_file]]>>=
+if isinstance(conf_file, io.IOBase):
+  try:
+    self.__conf_file = conf_file.name
+  except AttributeError:
+    raise ValueError(f"can't enable writeback when `conf_file` is "
+                     f"a file-like object without a name: {conf_file}")
+else:
+  self.__conf_file = conf_file
+@
+
+We also want the corresponding write call in the [[.set]] method to actually 
+write back the config to file when it has successfully updated the config.
+<<set writeback doc>>=
+If write back is set (see `.__init__` and `.read_config`), a successful set 
+will also update the original config file.
+<<set writeback code>>=
+if self.__conf_file:
+  self.write_config(self.__conf_file)
+@
+
+Let's test this.
+We create a named temporary file.
+Then we write to it once, to have an initial config file.
+(Otherwise, JSON can't decode an empty file.)
+Then we try to get the original value and then change it.
+Finally, we try to read the config to see if the changed value was actually 
+written to the file.
+<<test functions>>=
+def test_writeback_constructor():
+  with tempfile.NamedTemporaryFile("w") as tmp_conf_file:
+    tmp_conf_file_name = "/tmp/writeback" #tmp_conf_file.name
+    path = "the.path"
+    first_value = "1st"
+    second_value = "2nd"
+
+    initial_conf = Config()
+    initial_conf.set(path, first_value)
+    initial_conf.write_config(tmp_conf_file_name)
+
+    conf = Config(conf_file=tmp_conf_file_name)
+    assert conf.get(path) == first_value
+    conf.set(path, second_value)
+
+    last_conf = Config()
+    last_conf.read_config(tmp_conf_file_name)
+    assert last_conf.get(path) == second_value
+<<test imports>>=
+import tempfile
+@
+
+We would like to be able to enable write back when we call [[.read_config]] 
+too.
+We want this in case we have an already created [[Config]] object, but want the 
+automatic write back.
+So we add an argument for that, but it defaults to not enabling it.
+<<additional [[read_config]] args>>=
+writeback=False
+<<additional [[read_config]] args doc>>=
+If `writeback` is set to True, store the `conf_file` object and turn on 
+automatic write back. This means that any changes using the `.set` method will 
+cause the config being written back to the file.
+
+Note that write back cannot be enabled with already opened files (as the mode 
+is already fixed).
+<<additional [[read_config]] args processing>>=
+if writeback:
+  <<set [[self.__conf_file]] based on [[conf_file]]>>
+@
+
+We test this in a similar fashion as before.
+However, now we will use the [[.read_config]] method to set the write back.
+<<test functions>>=
+def test_writeback_read_config():
+  with tempfile.NamedTemporaryFile("w") as tmp_conf_file:
+    tmp_conf_file_name = "/tmp/writeback" #tmp_conf_file.name
+    path = "the.path"
+    first_value = "1st"
+    second_value = "2nd"
+
+    initial_conf = Config()
+    initial_conf.set(path, first_value)
+    initial_conf.write_config(tmp_conf_file_name)
+
+    conf = Config()
+    conf.read_config(tmp_conf_file_name, writeback=True)
+    assert conf.get(path) == first_value
+    conf.set(path, second_value)
+
+    last_conf = Config()
+    last_conf.read_config(tmp_conf_file_name)
+    assert last_conf.get(path) == second_value
 @
 
 
