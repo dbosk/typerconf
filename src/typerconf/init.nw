@@ -436,13 +436,7 @@ def read_config(self, conf_file=f"{dirs.user_config_dir}/config.json",
   - an integer, which is a file descriptor (see `os.open`).
 @
 
-Let's start with the short one.
-To read the data, we simply use the [[json]] library to turn the file contents 
-into a dictionary.
-<<read the data into [[self.__data]]>>=
-self.__data = json.load(conf_file)
-@
-
+Let's start with reading the config file.
 If we must open the file ourselves, we simply do that.
 But we do it in such a way that we can reuse
 [[<<read the data into [[self.__data]]>>]].
@@ -471,6 +465,93 @@ def test_read_config():
   assert "https://..." in conf.get("courses.datintro22.url")
 <<test imports>>=
 import tempfile
+@
+
+To read the data, we simply use the [[json]] library to turn the file contents 
+into a dictionary.
+However, we want to update any existing data, not just replace it.
+This way we can have a basic config and then complement it by reading from a 
+file.
+<<read the data into [[self.__data]]>>=
+self.__data = merge_dictionaries(self.__data, json.load(conf_file))
+@
+
+Now, let's turn to that merge.
+For this to work as expected, we must do this recursively.
+<<merge dir doc>>=
+Returns a copy of dir1 with values in dir1 updated from dir2 for keys that 
+exist. Keys that exist in dir2 are created in dir, with the proper values.
+
+The merge recurses through values that are dictionaries, which makes this 
+different from `dir1 | dir2` and `{**dir1, **dir2}`. Using those would replace 
+entire subdictionaries instead of merging them.
+<<helper functions>>=
+def merge_dictionaries(dir1, dir2):
+  """
+  <<merge dir doc>>
+  """
+  dir = dir1.copy()
+
+  for key, value in dir2.items():
+    <<update [[dir[key]]] with value>>
+
+  return dir
+@
+
+To do the update, we need to check if [[value]] is a (sub)dictionary.
+However, we also need to check if [[dir[key]]] is a dictionary.
+If both are dictionaries, we should merge.
+Otherwise, we simply replace.
+
+To not have to read out [[dir[key]]] too many times, we use the walrus operator 
+to store its value in [[current_value]].
+And since we place it after the [[and]] in the conditional, we only read it 
+when absolutely necessary.
+<<update [[dir[key]]] with value>>=
+try:
+  if isinstance(value, dict) and isinstance(current_value := dir[key], dict):
+    dir[key] = merge_dictionaries(current_value, value)
+  else:
+    dir[key] = value
+except KeyError:
+  dir[key] = value
+@
+
+Let's test this.
+<<test functions>>=
+def test_merge_dictionaries():
+  a = {"a": 1, "b": {"c": 3}}
+  b = {"a": 2, "b": {"d": 4}}
+  c = {"a": {"b": 2}, "c": 3}
+
+  ab = merge_dictionaries(a, b)
+  assert ab["a"] == 2
+  assert "c" in a["b"] and not "d" in a["b"]
+  assert "c" in ab["b"] and "d" in ab["b"]
+
+  ac = merge_dictionaries(a, c)
+  assert ac["a"]["b"] == 2 and ac["c"] == 3 and ac["b"]["c"] == 3
+@
+
+Let's also test that this works for configs.
+<<test functions>>=
+def test_read_config_merge():
+  conf = Config()
+  conf.set("a.b", 1)
+  conf.set("a.c", 2)
+
+  with tempfile.NamedTemporaryFile("w", delete=False) as outfile:
+    conf.write_config(outfile.file)
+
+  conf2 = Config()
+  conf2.set("a.b", 3)
+  conf2.set("a.d", 4)
+
+  assert conf2.get("a.b") == 3
+  assert conf2.get("a.d") == 4
+  conf2.read_config(outfile.name)
+  assert conf2.get("a.b") == 1
+  assert conf2.get("a.d") == 4
 @
 
 \subsubsection{Reading errors}
