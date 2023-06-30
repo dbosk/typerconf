@@ -24,6 +24,9 @@ For instance, we can use \texttt{courses.datintro22.schedule.url} to access the
 TimeEdit URL of the datintro22 course.
 
 Let's have a look at some usage examples.
+
+\subsubsection{A command-line application}
+
 Say we have the program \texttt{nytid} that wants to use this config module and 
 subcommand.
 \begin{minted}{python}
@@ -52,4 +55,50 @@ import typerconf as config
 
 url = config.get("courses.datintro22.schedule.url")
 \end{minted}
+
+\subsubsection{Without the CLI}
+
+We can also use it without the CLI and application features.
+Then it's the \texttt{typerconf.Config} class that is of interest.
+
+Let's assume that we have the structure from above (\cref{ConfigStructure}) in 
+the file \mintinline{bash}{~/.config/app.config}.
+Consider the following code.
+\begin{minted}[mathescape]{python}
+defaults = {
+  "courses": {
+    "datintro22": {
+      "root": "/afs/kth.se/..."
+    }
+  }
+}
+
+conf = Config(json_data=defaults, conf_file="~/.config/app.config")
+
+print(f"datintro22 root directory = {conf.get('courses.datintro22.root')}")
+print(f"datintro22 schedule = {conf.get('courses.datintro22.schedule')}")
+\end{minted}
+When we construct \mintinline{python}{conf} above, we merge the default config 
+with the values set in the config file that was loaded.
+
+We note that the construction of \mintinline{python}{conf} above, can be 
+replaced by the equivalent
+\begin{minted}[linenos=false]{python}
+conf = Config(defaults)
+conf.read_config("~/.config/app.config", writeback=True)
+\end{minted}
+The meaning of \mintinline{python}{writeback} is that whenever we change the 
+config, it will automatically be written back to the file from which it was 
+read.
+Writeback is enabled by default when supplying the file to the constructor.
+It's disabled by default for the method \mintinline{python}{conf.read_config}, 
+but we can turn it on by passing the \mintinline{python}{writeback=True}.
+
+We can change the config by using the \mintinline{python}{conf.set} method.
+\begin{minted}[firstnumber=13]{python}
+conf.set("courses.datintro22.root", "/home/dbosk/...")
+\end{minted}
+That would change the root that we got from the default config.
+Since we enabled writeback above, this would automatically update the config 
+file with the new values.
 

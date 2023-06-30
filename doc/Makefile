@@ -8,6 +8,7 @@ PYTHONTEXFLAGS=	--interpreter "python:poetry run python3"
 typerconf.pdf: ../src/typerconf/init.tex
 typerconf.pdf: ../src/typerconf
 
+typerconf.pdf: typerconf.tex overview.tex usage.tex
 typerconf.pdf: preamble.tex abstract.tex ../LICENSE
 
 ../src/typerconf::
