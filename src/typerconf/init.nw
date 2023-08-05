@@ -278,6 +278,16 @@ def test_set_path_list():
   assert gotten_value == value
 @
 
+We also want to test short paths.
+<<test functions>>=
+def test_set_short_path():
+  value = "Test Tester"
+  path = "contact"
+  conf.set(path, value)
+
+  assert conf.get(path) == value
+@
+
 When we want to remove a node, the pythonic way is to simply try to remove it.
 If it doesn't exist, we silently fail.
 The reasoning is as follows: the goal is to remove something; if it doesn't 
@@ -300,6 +310,19 @@ def test_set_path_remove():
   conf.set("test", None)
   try:
     conf.get("test")
+  except KeyError:
+    assert True
+  else:
+    assert False
+@
+
+We also want to remove from a longer path.
+<<test functions>>=
+def test_set_path_list():
+  path = "courses.prgx22.TAs"
+  conf.set(path, None)
+  try:
+    conf.get(path)
   except KeyError:
     assert True
   else:
@@ -921,6 +944,8 @@ if values == "":
   values = None
 @
 
+\subsection{Testing the config command}
+
 Let's test this command.
 We'll set up the testing.
 <<test functions>>=
@@ -936,7 +961,7 @@ Let's look at the actual tests.
 <<run tests on [[cli]]>>=
 # set example data
 result = runner.invoke(cli,
-                        ["courses.datintro22.url", "--set", "https://..."])
+                       ["courses.datintro22.url", "--set", "https://..."])
 assert result.exit_code == 0
 
 # try access nonexisting
@@ -949,7 +974,7 @@ assert "courses.datintro22.url = https://..." in result.stdout
 
 # clear config
 result = runner.invoke(cli,
-                        ["courses", "--set", None])
+                       ["courses", "--set", ""])
 assert result.exit_code == 0
 
 # check that it's cleared
