@@ -997,6 +997,26 @@ def test_cli_not_default_conf():
   <<run tests on [[cli]]>>
 @
 
+We'll do another round of tests, but this time for shorter paths.
+<<test functions>>=
+def test_short_paths():
+  result = runner.invoke(cli, ["contact"])
+  assert result.exit_code != 0
+
+  result = runner.invoke(cli,
+                        ["contact", "--set", "me"])
+  assert result.exit_code == 0
+
+  result = runner.invoke(cli, ["contact"])
+  assert "contact = me" in result.stdout
+
+  result = runner.invoke(cli,
+                        ["contact", "--set", ""])
+  assert result.exit_code == 0
+
+  result = runner.invoke(cli, ["contact"])
+  assert result.exit_code != 0
+@
 
 \subsection{Autocompleting the path}
 
