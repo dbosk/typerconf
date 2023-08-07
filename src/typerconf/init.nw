@@ -536,35 +536,36 @@ The merge recurses through values that are dictionaries, which makes this
 different from `dir1 | dir2` and `{**dir1, **dir2}`. Using those would replace 
 entire subdictionaries instead of merging them.
 <<helper functions>>=
-def merge_dictionaries(dir1, dir2):
+def merge_dictionaries(dict1: dict, dict2: dict):
   """
   <<merge dir doc>>
   """
-  dir = dir1.copy()
+  new_dict = dict1.copy()
 
-  for key, value in dir2.items():
-    <<update [[dir[key]]] with value>>
+  for key, value in dict2.items():
+    <<update [[new_dict[key]]] with value>>
 
-  return dir
+  return new_dict
 @
 
 To do the update, we need to check if [[value]] is a (sub)dictionary.
-However, we also need to check if [[dir[key]]] is a dictionary.
+However, we also need to check if [[new_dict[key]]] is a dictionary.
 If both are dictionaries, we should merge.
 Otherwise, we simply replace.
 
-To not have to read out [[dir[key]]] too many times, we use the walrus operator 
+To not have to read out [[new_dict[key]]] too many times, we use the walrus operator 
 to store its value in [[current_value]].
 And since we place it after the [[and]] in the conditional, we only read it 
 when absolutely necessary.
-<<update [[dir[key]]] with value>>=
+<<update [[new_dict[key]]] with value>>=
 try:
-  if isinstance(value, dict) and isinstance(current_value := dir[key], dict):
-    dir[key] = merge_dictionaries(current_value, value)
+  if isinstance(value, dict) and \
+      isinstance(current_value := new_dict[key], dict):
+    new_dict[key] = merge_dictionaries(current_value, value)
   else:
-    dir[key] = value
+    new_dict[key] = value
 except KeyError:
-  dir[key] = value
+  new_dict[key] = value
 @
 
 Let's test this.
