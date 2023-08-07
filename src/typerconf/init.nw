@@ -9,9 +9,11 @@ import io
 import json
 import logging
 import os
+import pathlib
 import sys
 import typer
 import typing
+from typing_extensions import Annotated
 
 <<set up appdirs dirs>>
 
@@ -123,7 +125,7 @@ Both work with these dot-separated addresses.
 class Config:
   """Navigates nested JSON structures by dot-separated addressing."""
 
-  def __init__(self, json_data=None,
+  def __init__(self, json_data: dict = None,
                      <<Config constructor args>>):
     """
     Constructs a config object to navigate from JSON data `json_data`.
@@ -390,7 +392,7 @@ def test_set_path_create_parents():
 Lastly, what we want to do is to create a list containing all paths in the 
 config.
 <<Config methods for available paths>>=
-def paths(self, from_root=""):
+def paths(self, from_root: str = ""):
   """
   Returns all existing paths.
 
@@ -457,8 +459,10 @@ Let's start with reading.
 Anything that is derived from [[io.IOBase]] is already opened.
 Anything else, we pass to [[open]] to handle.
 <<Config methods for reading from and writing to file>>=
-def read_config(self, conf_file=f"{dirs.user_config_dir}/config.json",
-                      <<additional [[read_config]] args>>):
+def read_config(self,
+                conf_file: pathlib.Path =
+                  f"{dirs.user_config_dir}/config.json",
+                <<additional [[read_config]] args>>):
   """
   Reads the config data structure (JSON) into the Config object.
 
@@ -532,35 +536,36 @@ The merge recurses through values that are dictionaries, which makes this
 different from `dir1 | dir2` and `{**dir1, **dir2}`. Using those would replace 
 entire subdictionaries instead of merging them.
 <<helper functions>>=
-def merge_dictionaries(dir1, dir2):
+def merge_dictionaries(dict1: dict, dict2: dict):
   """
   <<merge dir doc>>
   """
-  dir = dir1.copy()
+  new_dict = dict1.copy()
 
-  for key, value in dir2.items():
-    <<update [[dir[key]]] with value>>
+  for key, value in dict2.items():
+    <<update [[new_dict[key]]] with value>>
 
-  return dir
+  return new_dict
 @
 
 To do the update, we need to check if [[value]] is a (sub)dictionary.
-However, we also need to check if [[dir[key]]] is a dictionary.
+However, we also need to check if [[new_dict[key]]] is a dictionary.
 If both are dictionaries, we should merge.
 Otherwise, we simply replace.
 
-To not have to read out [[dir[key]]] too many times, we use the walrus operator 
+To not have to read out [[new_dict[key]]] too many times, we use the walrus operator 
 to store its value in [[current_value]].
 And since we place it after the [[and]] in the conditional, we only read it 
 when absolutely necessary.
-<<update [[dir[key]]] with value>>=
+<<update [[new_dict[key]]] with value>>=
 try:
-  if isinstance(value, dict) and isinstance(current_value := dir[key], dict):
-    dir[key] = merge_dictionaries(current_value, value)
+  if isinstance(value, dict) and \
+      isinstance(current_value := new_dict[key], dict):
+    new_dict[key] = merge_dictionaries(current_value, value)
   else:
-    dir[key] = value
+    new_dict[key] = value
 except KeyError:
-  dir[key] = value
+  new_dict[key] = value
 @
 
 Let's test this.
@@ -664,7 +669,9 @@ def test_conf_read_errors():
 Conversely, we want to write the data to the config file as well.
 We do the same things as above, but open for writing instead.
 <<Config methods for reading from and writing to file>>=
-def write_config(self, conf_file=f"{dirs.user_config_dir}/config.json"):
+def write_config(self,
+                 conf_file: pathlib.Path =
+                  f"{dirs.user_config_dir}/config.json"):
   """
   Stores the config data (as JSON) in the config file.
   <<[[conf_file]] argument doc>>
@@ -927,8 +934,8 @@ except ValueError:
 <<default values for [[config_cmd]]>>
 
 @cli.command(name="config")
-def config_cmd(path: str = path_arg,
-               values: typing.List[str] = value_arg):
+def config_cmd(path: Annotated[str, path_arg] = "",
+               values: Annotated[typing.List[str], value_arg] = []):
   """
   Reads values from or writes values to the config.
   """
@@ -945,12 +952,11 @@ arguments and options should behave.
 We can autocomplete the path since we can predict the possible values.
 The same cannot be said of the value to store, that can be arbitrary.
 <<default values for [[config_cmd]]>>=
-path_arg = typer.Argument("",
-                          help="Path in config, e.g. 'courses.datintro22'. "
+path_arg = typer.Argument(help="Path in config, e.g. 'courses.datintro22'. "
                                "Empty string is root of config. Defaults to "
                                "the empty string.",
                           autocompletion=complete_path_callback)
-value_arg = typer.Option([], "-s", "--set",
+value_arg = typer.Option("-s", "--set",
                          help="Values to store. "
                               "More than one value makes a list. "
                               "Values are treated as JSON if possible.")
@@ -1100,7 +1106,7 @@ The idea is that the config path will move from the dictionary representation
 in [[conf]] to the string representation in [[path]].
 When at the leaf, [[conf]] will contain the value and [[path]] the entire path.
 <<helper functions>>=
-def print_config(conf, path=""):
+def print_config(conf: Config, path: str = ""):
   """
   Prints the config tree contained in `conf` to stdout.
   Optional `path` is prepended.
