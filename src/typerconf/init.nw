@@ -513,6 +513,10 @@ def test_read_config():
   with open(tmp_conf) as conf_file:
     conf.read_config(conf_file)
   assert "https://..." in conf.get("courses.datintro22.url")
+
+  conf = Config()
+  conf.read_config(pathlib.Path(tmp_conf))
+  assert "https://..." in conf.get("courses.datintro22.url")
 <<test imports>>=
 import tempfile
 @
