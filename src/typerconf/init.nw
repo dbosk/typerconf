@@ -929,7 +929,7 @@ Otherwise, we supply [[.read_config]] with the [[conf_path]] value.
 conf = Config()
 try:
   if conf_path:
-    conf.read_config(conf_path)
+    conf.read_config(conf_path, writeback=True)
   else:
     conf.read_config()
 except ValueError:
