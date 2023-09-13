@@ -699,7 +699,7 @@ We don't need any error handling for writing though, because all errors are
 fatal, we can't recover from any of the possible errors.
 <<open and write the config file>>=
 conf_dir = os.path.dirname(conf_file)
-if not os.path.isdir(conf_dir):
+if conf_dir and not os.path.isdir(conf_dir):
   os.makedirs(conf_dir)
 
 with open(conf_file, "w") as conf_file:
