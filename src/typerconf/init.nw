@@ -931,7 +931,7 @@ try:
   if conf_path:
     conf.read_config(conf_path, writeback=True)
   else:
-    conf.read_config()
+    conf.read_config(writeback=True)
 except ValueError:
   pass
 
