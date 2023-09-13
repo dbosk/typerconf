@@ -935,7 +935,7 @@ try:
 except ValueError:
   pass
 
-<<default values for [[config_cmd]]>>
+<<argument definitions for [[config_cmd]]>>
 
 @cli.command(name="config")
 def config_cmd(path: Annotated[str, path_arg] = "",
@@ -955,7 +955,7 @@ The default values are the special Typer objects that specify how the command
 arguments and options should behave.
 We can autocomplete the path since we can predict the possible values.
 The same cannot be said of the value to store, that can be arbitrary.
-<<default values for [[config_cmd]]>>=
+<<argument definitions for [[config_cmd]]>>=
 path_arg = typer.Argument(help="Path in config, e.g. 'courses.datintro22'. "
                                "Empty string is root of config. Defaults to "
                                "the empty string.",
