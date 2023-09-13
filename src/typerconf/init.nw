@@ -699,7 +699,7 @@ We don't need any error handling for writing though, because all errors are
 fatal, we can't recover from any of the possible errors.
 <<open and write the config file>>=
 conf_dir = os.path.dirname(conf_file)
-if not os.path.isdir(conf_dir):
+if conf_dir and not os.path.isdir(conf_dir):
   os.makedirs(conf_dir)
 
 with open(conf_file, "w") as conf_file:
@@ -929,13 +929,13 @@ Otherwise, we supply [[.read_config]] with the [[conf_path]] value.
 conf = Config()
 try:
   if conf_path:
-    conf.read_config(conf_path)
+    conf.read_config(conf_path, writeback=True)
   else:
     conf.read_config()
 except ValueError:
   pass
 
-<<default values for [[config_cmd]]>>
+<<argument definitions for [[config_cmd]]>>
 
 @cli.command(name="config")
 def config_cmd(path: Annotated[str, path_arg] = "",
@@ -955,7 +955,7 @@ The default values are the special Typer objects that specify how the command
 arguments and options should behave.
 We can autocomplete the path since we can predict the possible values.
 The same cannot be said of the value to store, that can be arbitrary.
-<<default values for [[config_cmd]]>>=
+<<argument definitions for [[config_cmd]]>>=
 path_arg = typer.Argument(help="Path in config, e.g. 'courses.datintro22'. "
                                "Empty string is root of config. Defaults to "
                                "the empty string.",
