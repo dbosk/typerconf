@@ -29,19 +29,8 @@ Let's have a look at some usage examples.
 ### A command-line application
 
 Say we have the program `nytid` that wants to use this config module and
-subcommand.
-
-```python
-import typer
-import typerconf as config
-
-cli = typer.Typer()
-# add some other subcommands
-config.add_config_cmd(cli)
-```
-
-We want the CLI command to have the following form when used with
-`nytid`.
+subcommand. We want the CLI command to have the following form when used
+with `nytid`.
 
 ```bash
   nytid config courses.datintro22.schedule.url --set https://timeedit.net/...
@@ -54,6 +43,33 @@ will set the configuration value at the path, whereas
 ```
 
 will return it.
+
+We can do this with both `typer` (and `click`) and `argparse`. With
+`typer`:
+
+```python
+import typer
+import typerconf as config
+
+cli = typer.Typer()
+config.add_config_cmd(cli)
+```
+
+With `argparse`:
+
+```python
+import argparse
+import typerconf as config
+import sys
+
+cli = argparse.ArgumentParser()
+subparsers = cli.add_subparsers(dest="subcommand")
+config.add_config_cmd(subparsers)
+
+args = cli.parse_args()
+if args.subcommand == "config":
+  args.func(args)
+```
 
 Internally, `nytid`'s different parts can access the config through the
 following API.
