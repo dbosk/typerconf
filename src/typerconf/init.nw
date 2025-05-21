@@ -1174,7 +1174,7 @@ except AttributeError:
 @
 
 
-\section{\texttt{argarse} support}\label{argparse}
+\section{\texttt{argparse} support}\label{argparse}
 
 We also want to provide support for the [[argparse]] module.
 We want to allow adding the [[config]] command to an existing 
