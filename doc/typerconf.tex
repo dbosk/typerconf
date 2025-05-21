@@ -1,16 +1,19 @@
-\documentclass[a4paper,oneside]{article}
+\documentclass[a4paper,oneside,oldfontcommands,article]{memoir}
+\let\subsubsection\subsection
+\let\subsection\section
+\let\section\chapter
+
 \usepackage{abstract}
 \usepackage{noweb}
-% Needed to relax penalty for breaking code chunks across pages, otherwise 
-% there might be a lot of space following a code chunk.
-\def\nwendcode{\endtrivlist \endgroup}
-\let\nwdocspar=\smallbreak
+\noweboptions{breakcode,longchunks,longxref}
 
 \usepackage[hyphens]{url}
-\usepackage{hyperref}
+\usepackage[colorlinks]{hyperref}
 \usepackage{authblk}
 
 \input{preamble.tex}
+\crefname{chapter}{section}{sections}
+\Crefname{chapter}{Section}{Sections}
 
 \title{%
   \texttt{typerconf}:

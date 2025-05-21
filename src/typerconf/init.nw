@@ -5,6 +5,7 @@ The base structure is standard.
 """The typerconf module and config subcommand"""
 
 import appdirs
+import argparse
 import io
 import json
 import logging
@@ -27,7 +28,7 @@ if __name__ == "__main__":
   main()
 @
 
-\subsection{Not using [[add_typer]]}
+\subsection{Adding the config command}
 
 With the design outlined in \cref{Overview}, we can't use the default way of 
 Typer ([[.add_typer]]), as that would require another level of subcommands:
@@ -47,11 +48,34 @@ as is normally done with Typer, that module will actually have to do
 \begin{minted}{python}
 import typerconf as config
 # ...
-config.add_config_cmd(cli)
+config.add_config_typer(cli)
 \end{minted}
-So we need to provide such a function.
+
+This also allows us to use the same function for both [[typer]] and 
+[[argparse]].
 <<helper functions>>=
-def add_config_cmd(cli: typer.Typer, conf_path: str = None):
+def add_config_cmd(cli: typing.Union[typer.Typer, argparse._SubParsersAction],
+                   conf_path: str = None):
+  """
+  Add config command to a command-line interface `cli`.
+
+  `cli` can be either a Typer instance or an argparse subparser.
+
+  If `conf_path` is not None, use that file instead of the default.
+  """
+  if isinstance(cli, typer.Typer):
+    add_config_typer(cli, conf_path)
+  elif isinstance(cli, argparse._SubParsersAction):
+    add_config_argparse(cli, conf_path)
+  else:
+    raise TypeError(f"cli must be a Typer instance or an argparse subparser, "
+                    f"not {type(cli)}")
+@
+
+We'll start with the Typer version and then return to the [[argparse]] version 
+in \cref{argparse}.
+<<helper functions>>=
+def add_config_typer(cli: typer.Typer, conf_path: str = None):
   """
   Add config command to Typer instance `cli`.
 
@@ -76,6 +100,7 @@ We also want to test all functions we provide in this module.
 These test functions are all prepended [[test_]] to the function name.
 We will run them using [[pytest]].
 <<test init.py>>=
+import argparse
 import sys
 sys.argv[0] = "typerconf"
 
@@ -83,9 +108,6 @@ import typer
 from typerconf import *
 
 <<test imports>>
-
-cli = typer.Typer()
-add_config_cmd(cli)
 
 <<test functions>>
 @
@@ -989,9 +1011,13 @@ We'll set up the testing.
 runner = CliRunner()
 
 def test_cli():
+  <<create basic [[cli]] with config command>>
   <<run tests on [[cli]]>>
 <<test imports>>=
 from typer.testing import CliRunner
+<<create basic [[cli]] with config command>>=
+cli = typer.Typer()
+add_config_cmd(cli)
 @
 
 Let's look at the actual tests.
@@ -1037,6 +1063,8 @@ def test_cli_not_default_conf():
 We'll do another round of tests, but this time for shorter paths.
 <<test functions>>=
 def test_short_paths():
+  <<create basic [[cli]] with config command>>
+
   result = runner.invoke(cli, ["contact"])
   assert result.exit_code != 0
 
@@ -1143,4 +1171,79 @@ Then the complete path is in [[path]], the value in [[conf]].
 <<print the leaf of config tree and return>>=
 except AttributeError:
   print(f"{path} = {conf}")
+@
 
+
+\section{\texttt{argarse} support}\label{argparse}
+
+We also want to provide support for the [[argparse]] module.
+We want to allow adding the [[config]] command to an existing 
+[[argparse.ArgumentParser]] instance.
+This should be a function similar to [[add_config_typer]].
+<<helper functions>>=
+def add_config_argparse(subparsers: argparse._SubParsersAction,
+                        conf_path: str = None):
+  """
+  Adds the config command to the `parser` instance.
+  """
+  <<add [[config]] subcommand to [[subparsers]]>>
+@
+
+To add the subcommand [[config]] to the parser, we must add a subparser to the 
+[[ArgumentParser]] instance.
+<<add [[config]] subcommand to [[subparsers]]>>=
+config_parser = subparsers.add_parser("config",
+                                      help="Read or write the config.")
+@
+
+We also want to add the arguments to the subparser.
+<<add [[config]] subcommand to [[subparsers]]>>=
+config_parser.add_argument("path",
+                            help="Path in config, e.g. 'courses.datintro22'. "
+                                 "Empty string is root of config. Defaults to "
+                                 "the empty string.",
+                            type=str,
+                            nargs="?",
+                            default="")
+config_parser.add_argument("-s", "--set",
+                            help="Values to store. "
+                                 "More than one value makes a list. "
+                                 "Values are treated as JSON if possible.",
+                            type=str,
+                            nargs="*",
+                            default=[])
+@
+
+Now all we need to do is to provide a function that will call the 
+[[config_cmd]] function with the arguments from the command line.
+<<add [[config]] subcommand to [[subparsers]]>>=
+config_parser.set_defaults(func=config_argparse)
+<<helper functions>>=
+def config_argparse(args: argparse.Namespace):
+  """
+  Calls the config command with the arguments from the command line.
+  `args` is what the [[parser.parse_args()]] function returns.
+  """
+  config_cmd(args.path, args.set)
+@
+
+Now let's test this.
+<<test functions>>=
+def test_argparse():
+  parser = argparse.ArgumentParser()
+  subparsers = parser.add_subparsers()
+  add_config_argparse(subparsers)
+
+  args = parser.parse_args(["config", "courses.datintro22.url"])
+  assert args.path == "courses.datintro22.url"
+  assert args.set == []
+
+  args = parser.parse_args(["config", "courses.datintro22.url", "--set",
+                            "https://..."])
+  assert args.path == "courses.datintro22.url"
+  assert args.set == ["https://..."]
+
+  args = parser.parse_args(["config", "--set", "https://..."])
+  assert args.path == ""
+  assert args.set == ["https://..."]
+@
