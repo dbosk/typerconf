@@ -29,16 +29,8 @@ Let's have a look at some usage examples.
 
 Say we have the program \texttt{nytid} that wants to use this config module and 
 subcommand.
-\begin{minted}{python}
-import typer
-import typerconf as config
-
-cli = typer.Typer()
-# add some other subcommands
-config.add_config_cmd(cli)
-\end{minted}
-
-We want the CLI command to have the following form when used with \texttt{nytid}.
+We want the CLI command to have the following form when used with 
+\texttt{nytid}.
 \begin{minted}{bash}
   nytid config courses.datintro22.schedule.url --set https://timeedit.net/...
 \end{minted}
@@ -48,8 +40,33 @@ will set the configuration value at the path, whereas
 \end{minted}
 will return it.
 
+We can do this with both \texttt{typer} (and \texttt{click}) and \texttt{argparse}.
+With \texttt{typer}:
+\begin{minted}{python}
+import typer
+import typerconf as config
+
+cli = typer.Typer()
+config.add_config_cmd(cli)
+\end{minted}
+
+With \texttt{argparse}:
+\begin{minted}{python}
+import argparse
+import typerconf as config
+import sys
+
+cli = argparse.ArgumentParser()
+subparsers = cli.add_subparsers(dest="subcommand")
+config.add_config_cmd(subparsers)
+
+args = cli.parse_args()
+if args.subcommand == "config":
+  args.func(args)
+\end{minted}
+
 Internally, \texttt{nytid}'s different parts can access the config through the 
-following API.
+following API\@.
 \begin{minted}{python}
 import typerconf as config
 
