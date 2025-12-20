@@ -14,7 +14,17 @@ classifiers = [
     "Environment :: Console",
     "Topic :: Utilities"
 ]
-include = ["src/**/*.py"]
+include = [
+    { path = "src/**/*.py", format = ["wheel"] },
+    { path = "src/**/*.nw", format = ["sdist"] },
+]
+exclude = [
+    { path = "src/**/*.py", format = ["sdist"] },
+    { path = "src/**/*.nw", format = ["wheel"] },
+    { path = "src/**/.gitignore", format = ["wheel"] },
+    { path = "src/**/Makefile", format = ["wheel"] },
+    { path = "src/**/*.tex", format = ["wheel"] },
+]
 packages = [{include = "typerconf", from = "src"}]
 
 [tool.poetry.urls]
