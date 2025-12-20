@@ -15,6 +15,7 @@ classifiers = [
     "Topic :: Utilities"
 ]
 include = ["src/**/*.py"]
+packages = [{include = "typerconf", from = "src"}]
 
 [tool.poetry.urls]
 "Bug Tracker" = "https://github.com/dbosk/typerconf/issues"
