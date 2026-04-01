@@ -319,6 +319,28 @@ def test_set_path_in_list():
   conf.set(path, value)
   assert conf.get(path) == value
 
+def test_set_path_in_list_of_dicts():
+  conf = Config({
+    "hr": {
+      "amanuensis": {
+        "periods": [
+          {
+            "start": "2025-08-25",
+            "end": "2025-10-26"
+          },
+          {
+            "start": "2025-10-27",
+            "end": "2026-01-12"
+          }
+        ]
+      }
+    }
+  })
+
+  path = "hr.amanuensis.periods.1.start"
+  conf.set(path, "2025-11-01")
+  assert conf.get(path) == "2025-11-01"
+
 def test_set_path_list():
   value = ["Asse", "Assa", "Asselina"]
   path = "courses.prgx22.TAs"
