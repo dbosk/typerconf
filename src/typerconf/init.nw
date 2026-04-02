@@ -206,7 +206,7 @@ def get(self, path: str = "") -> typing.Any:
   Path segments are interpreted from the current container type.
   Numeric segments become integer indices only when traversing a list.
   When traversing a dictionary they remain strings, which keeps JSON keys such
-  as [["1"]] accessible after reloading from disk.
+  as "1" accessible after reloading from disk.
   """
   <<get value at path>>
 @
