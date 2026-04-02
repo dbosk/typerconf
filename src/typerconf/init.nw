@@ -203,8 +203,10 @@ def get(self, path: str = "") -> typing.Any:
   - Config contains `{"courses": {"datintro22": {"url": "https://..."}}}` 
     will return "https://...".
 
-  Any part of the path that can be converted to an integer, will be converted 
-  to an integer. This way we can access elements of lists too.
+  Path segments are interpreted from the current container type.
+  Numeric segments become integer indices only when traversing a list.
+  When traversing a dictionary they remain strings, which keeps JSON keys such
+  as "1" accessible after reloading from disk.
   """
   <<get value at path>>
 @
@@ -215,7 +217,12 @@ def test_get_path():
   assert conf.get("courses.datintro22.url") == "https://..."
 @
 
-To get the value, we simply walk along the path and returns what remains.
+To get the value, we walk along the path and return what remains.
+When a path segment is numeric, we cannot decide up front whether it should be
+an integer index or a string key.
+JSON objects always store keys as strings, even if they look numeric, whereas
+lists require integer indices.
+So we interpret each segment from the type of the current container.
 <<get value at path>>=
 structure = self.__data
 
@@ -223,22 +230,24 @@ if not path:
   return structure
 
 for part in path.split("."):
-  <<check if part is an integer, if so, convert it>>
+  <<adapt [[part]] to the current [[structure]]>>
   try:
     structure = structure[part]
-  except KeyError:
+  except (KeyError, IndexError, TypeError):
     raise KeyError(f"{part} along {path} doesn't exist")
 
 return structure
 @
 
-To handle integers on the path, we do it in the pythonic way: we try to convert 
-it, if it fails, we just continue with the non-integer value.
-<<check if part is an integer, if so, convert it>>=
-try:
-  part = int(part)
-except ValueError:
-  pass
+Lists use integer indices, but dictionaries keep their keys as strings.
+We therefore only convert a path segment when we know that the current
+container is a list.
+<<adapt [[part]] to the current [[structure]]>>=
+if isinstance(structure, list):
+  try:
+    part = int(part)
+  except ValueError:
+    raise KeyError(f"{part} along {path} doesn't exist")
 @
 
 We can test this as follows.
@@ -262,10 +271,11 @@ def set(self, path: str, value: typing.Any):
   - `path = "courses.datintro22.url"`
   will create `{"courses": {"datintro22": {"url": "https://..."}}}`.
 
-  Any part of the path that can be converted to an integer, will be converted 
-  to an integer. This way we can access elements of lists too. However, we 
-  cannot create index 3 in a list if it doesn't exist (we can't expand 
-  lists).
+  Path segments are interpreted from the current container type.
+  Numeric segments become integer indices only when traversing a list.
+  When traversing a dictionary they remain strings, which keeps JSON keys such
+  as [["1"]] accessible after reloading from disk.
+  We still cannot create index 3 in a list if it doesn't exist.
 
   If `value` is `None`, the entry at `path` will be deleted, if it exists.
 
@@ -280,6 +290,8 @@ We want to be able to specify a path and create all parents along the path if
 they don't exist.
 However, if the value is [[None]], we don't want to create an entry that 
 doesn't exist, but we want to delete one if it already exists.
+As for [[.get]], we resolve each path segment from the type of the current
+container so numeric JSON object keys remain usable.
 <<set value at path>>=
 structure = self.__data
 
@@ -288,12 +300,15 @@ parts = path.split(".")
 <<update structure to parent node, create parents if they don't exist>>
 
 part = parts[-1]
-<<check if part is an integer, if so, convert it>>
+<<adapt [[part]] to the current [[structure]]>>
 
 if value is None:
   <<remove part from the config>>
 else:
-  structure[part] = value
+  try:
+    structure[part] = value
+  except (IndexError, TypeError):
+    raise KeyError(f"{part} along {path} doesn't exist")
 @
 
 We can test this as follows.
@@ -303,6 +318,28 @@ def test_set_path_in_list():
   path = "courses.datintro22.TAs.0"
   conf.set(path, value)
   assert conf.get(path) == value
+
+def test_set_path_in_list_of_dicts():
+  conf = Config({
+    "hr": {
+      "amanuensis": {
+        "periods": [
+          {
+            "start": "2025-08-25",
+            "end": "2025-10-26"
+          },
+          {
+            "start": "2025-10-27",
+            "end": "2026-01-12"
+          }
+        ]
+      }
+    }
+  })
+
+  path = "hr.amanuensis.periods.1.start"
+  conf.set(path, "2025-11-01")
+  assert conf.get(path) == "2025-11-01"
 
 def test_set_path_list():
   value = ["Asse", "Assa", "Asselina"]
@@ -332,7 +369,7 @@ But we consider this silently failing most beneficial at the moment.)
 <<remove part from the config>>=
 try:
   del structure[part]
-except KeyError:
+except (KeyError, IndexError, TypeError):
   pass
 @
 
@@ -369,22 +406,25 @@ that we want to set a value for (or delete).
 We iterate through the path.
 <<update structure to parent node, create parents if they don't exist>>=
 for part in parts[:-1]:
-  <<check if part is an integer, if so, convert it>>
+  <<adapt [[part]] to the current [[structure]]>>
   try:
     structure = structure[part]
-  except KeyError:
-    <<handle node that doesn't exist>>
+  except (KeyError, IndexError, TypeError):
+    <<handle missing node along the path>>
 @
 
 If a node along the path doesn't exist, we want to create it.
 However, if [[value]] is [[None]], we actually want to delete the leaf, then we 
 don't create the parents if they don't exist either.
-<<handle node that doesn't exist>>=
-if value is None:
-  return
-else:
+If the current container is a list, we cannot create a missing index.
+<<handle missing node along the path>>=
+if isinstance(structure, dict):
+  if value is None:
+    return
   structure[part] = {}
   structure = structure[part]
+else:
+  raise KeyError(f"{part} along {path} doesn't exist")
 @
 
 We can test this as follows.
@@ -415,6 +455,8 @@ def paths(self, from_root: str = ""):
 What we want to do is to create a list containing all paths in the config.
 We will simply traverse the config tree and add paths as we go.
 We need to treat dictionaries and lists differently.
+For lists, we must recurse into each element instead of stopping at the index,
+otherwise completion would miss nested keys in list entries.
 And anything else is a leaf.
 <<return list of all paths>>=
 paths = []
@@ -430,7 +472,14 @@ if isinstance(root, dict):
     paths.append(path)
     paths += self.paths(from_root=path)
 elif isinstance(root, list):
-  paths += [f"{from_root}.{x}" for x in range(len(root))]
+  for index in range(len(root)):
+    if from_root:
+      path = f"{from_root}.{index}"
+    else:
+      path = str(index)
+
+    paths.append(path)
+    paths += self.paths(from_root=path)
 
 return paths
 @
@@ -1183,6 +1232,8 @@ def test_short_paths():
 
 The [[complete_path]] function returns the possible completions for an 
 incomplete path from the command line.
+Since completion is built from [[Config.paths()]], it also benefits from the
+container-aware path interpretation and the recursive traversal of lists.
 <<helper functions>>=
 def complete_path(initial_path: str, conf: Config = None):
   """
@@ -1212,6 +1263,62 @@ def test_complete_path():
   assert "courses.datintro22.TAs" in complete_path(incomplete, conf)
   assert "courses.datintro22.url" not in complete_path(incomplete, conf)
   assert len(list(complete_path(incomplete, conf))) >= 0
+
+def test_complete_path_numeric_dict_keys():
+  conf = Config({
+    "hr": {
+      "amanuensis": {
+        "periods": {
+          "1": {
+            "start": "2025-08-25",
+            "end": "2025-10-26"
+          }
+        }
+      }
+    }
+  })
+
+  incomplete = "hr.amanuensis.periods.1"
+  assert conf.get(f"{incomplete}.start") == "2025-08-25"
+  assert f"{incomplete}.start" in complete_path(incomplete, conf)
+
+def test_complete_path_list_of_dicts():
+  conf = Config({
+    "hr": {
+      "amanuensis": {
+        "periods": [
+          {
+            "start": "2025-08-25",
+            "end": "2025-10-26"
+          },
+          {
+            "start": "2025-10-27",
+            "end": "2026-01-12"
+          }
+        ]
+      }
+    }
+  })
+
+  incomplete = "hr.amanuensis.periods.1"
+  assert conf.get(f"{incomplete}.start") == "2025-10-27"
+  assert f"{incomplete}.start" in complete_path(incomplete, conf)
+
+def test_roundtrip_numeric_dict_keys():
+  conf = Config()
+  path = "hr.amanuensis.periods.1.start"
+  value = "2025-08-25"
+
+  conf.set(path, value)
+
+  with tempfile.NamedTemporaryFile("w", delete=False) as tmp_conf:
+    tmp_conf_name = tmp_conf.name
+
+  conf.write_config(tmp_conf_name)
+
+  loaded_conf = Config()
+  loaded_conf.read_config(tmp_conf_name)
+  assert loaded_conf.get(path) == value
 @
 
 Now, the callback must not have any additional arguments, like we want that 
