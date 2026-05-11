@@ -1,7 +1,7 @@
 The configuration is a JSON structure. We'll use the following for the
-coming examples.
+coming examples. []{#ConfigStructure label="ConfigStructure"}
 
-```JSON
+``` JSON
 {
   "courses": {
     "datintro22": {
@@ -32,13 +32,13 @@ Say we have the program `nytid` that wants to use this config module and
 subcommand. We want the CLI command to have the following form when used
 with `nytid`.
 
-```bash
+``` bash
   nytid config courses.datintro22.schedule.url --set https://timeedit.net/...
 ```
 
 will set the configuration value at the path, whereas
 
-```bash
+``` bash
   nytid config courses.datintro22.schedule.url
 ```
 
@@ -47,7 +47,7 @@ will return it.
 We can do this with both `typer` (and `click`) and `argparse`. With
 `typer`:
 
-```python
+``` python
 import typer
 import typerconf as config
 
@@ -57,7 +57,7 @@ config.add_config_cmd(cli)
 
 With `argparse`:
 
-```python
+``` python
 import argparse
 import typerconf as config
 import sys
@@ -74,7 +74,7 @@ if args.subcommand == "config":
 Internally, `nytid`'s different parts can access the config through the
 following API.
 
-```python
+``` python
 import typerconf as config
 
 url = config.get("courses.datintro22.schedule.url")
@@ -85,10 +85,12 @@ url = config.get("courses.datintro22.schedule.url")
 We can also use it without the CLI and application features. Then it's
 the `typerconf.Config` class that is of interest.
 
-Let's assume that we have the structure from above in the file 
-`~/.config/app.config`. Consider the following code.
+Let's assume that we have the structure from above
+([\[ConfigStructure\]](#ConfigStructure){reference-type="ref"
+reference="ConfigStructure"}) in the file `~/.config/app.config`{.bash}.
+Consider the following code.
 
-```python
+```python mathescape=""
 defaults = {
   "courses": {
     "datintro22": {
@@ -103,27 +105,27 @@ print(f"datintro22 root directory = {conf.get('courses.datintro22.root')}")
 print(f"datintro22 schedule = {conf.get('courses.datintro22.schedule')}")
 ```
 
-When we construct `conf` above, we merge the default config
+When we construct `conf`{.python} above, we merge the default config
 with the values set in the config file that was loaded.
 
-We note that the construction of `conf` above, can be replaced
+We note that the construction of `conf`{.python} above, can be replaced
 by the equivalent
 
-```python
+```python linenos="false"
 conf = Config(defaults)
 conf.read_config("~/.config/app.config", writeback=True)
 ```
 
-The meaning of `writeback` is that whenever we change the
+The meaning of `writeback`{.python} is that whenever we change the
 config, it will automatically be written back to the file from which it
 was read. Writeback is enabled by default when supplying the file to the
 constructor. It's disabled by default for the method
-`conf.read_config`, but we can turn it on by passing the
-`writeback=True`.
+`conf.read_config`{.python}, but we can turn it on by passing the
+`writeback=True`{.python}.
 
-We can change the config by using the `conf.set` method.
+We can change the config by using the `conf.set`{.python} method.
 
-```python
+```python startFrom="13"
 conf.set("courses.datintro22.root", "/home/dbosk/...")
 ```
 
