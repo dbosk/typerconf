@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "typerconf"
-version = "2.12"
+version = "2.13"
 description = "Library to read and write configs using API and CLI with Typer"
 authors = ["Daniel Bosk <daniel@bosk.se>"]
 license = "MIT"
@@ -33,7 +33,7 @@ packages = [{include = "typerconf", from = "src"}]
 
 [tool.poetry.dependencies]
 python = "^3.10"
-typer = "^0.25.1"
+typer = ">=0.25.1"
 platformdirs = "^4.9.6"
 
 [tool.poetry.group.dev.dependencies]
